@@ -15,8 +15,8 @@ import shutil
 
 
 
-support_path = r'your dir'
-global_path = r'your dir'
+support_path = r'/workspaces/support'
+global_path = r'/workspaces/global'
 
 
 def MR_normalize(x_in):
