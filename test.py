@@ -25,7 +25,7 @@ def MR_normalize(x_in):
     return x_in/255
 
 def ts_main(ckpt_path):
-
+    print("running?")
     settings = Settings() # parse .ini
     common_params, data_params, net_params, train_params, eval_params = settings['COMMON'], settings['DATA'], settings[
         'NETWORK'], settings['TRAINING'], settings['EVAL']
@@ -192,3 +192,6 @@ def ts_main(ckpt_path):
             nrrd.write(f'{save_path}/{query_name}_pred.nrrd', pred.transpose(2,1,0).astype(np.uint8))
             nrrd.write(f'{save_path}/{query_name}_sp.nrrd', sp.transpose(2,1,0).astype(np.uint8))
 
+print("running?")
+ckpt_path = "/home/karabo/code/Few-shot/data/rap.pth"
+ts = ts_main(ckpt_path)
