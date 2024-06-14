@@ -333,24 +333,26 @@ class RAP(nn.Module):
 if __name__ == '__main__':
 
     import argparse
-    from utils import config
+    from config import Config
+    import configparser
 
     def get_configs():
         parser = argparse.ArgumentParser(description='PyTorch Few Shot Semantic Segmentation')
-        parser.add_argument('--config', type=str, default='./settings.yaml', help='config file')
+        parser.add_argument('--config', type=str, default='./settings.cfg', help='config file')
         parser.add_argument('--mode', '-m', default='train',
                             help='run mode, valid values are train and eval')
         parser.add_argument('--device', '-d', default=0,
                             help='device to run on')
         args = parser.parse_args()
         assert args.config is not None
-        cfg = config.load_cfg_from_cfg_file(args.config)
+        print(args.config)
+        cfg = Config(args.config)
         return cfg, args
 
     cfgs, args = get_configs()
-    print(cfgs.DATA)
-    common_params, data_params, net_params, train_params, eval_params = cfgs.COMMON, cfgs.DATA, cfgs.NETWORK, \
-                                                                        cfgs.TRAINING, cfgs.EVAL
+    # print(cfgs['DATA'])
+    common_params, data_params, net_params, train_params, eval_params = cfgs['COMMON'], cfgs['DATA'], cfgs['NETWORK'], \
+                                                                        cfgs['TRAINING'], cfgs['EVAL']
 
     few_shot_model = SDnetSegmentor(net_params)
 
