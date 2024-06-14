@@ -101,12 +101,9 @@ class SDnetSegmentor(nn.Module):
             if isinstance(m, nn.Conv2d):
                 torch.nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
 
-    # def forward(self, inpt, weights=None, inpt_sp=None, inpt_mask=None, weights_pure=None, base_map=None, sp_prior_test=None, query_mask=None):
     def forward(self, inpt, inpt_sp=None, inpt_mask=None):
 
-
         bn, ind4, ind3, ind2, ind1, e4, e3, e2, e1 = self.seg_branch_encoder(inpt)
-
 
         if inpt_sp is not None and len(inpt_sp.shape) == 5:
             tmp_sp_poriors = []
