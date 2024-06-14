@@ -31,3 +31,4 @@ torch==2.2.2
 triton==2.2.0
 typing-extensions==4.11.0
 tzdata==2024.1
+utils==1.0.2
