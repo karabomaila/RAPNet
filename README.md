@@ -8,6 +8,10 @@ This repository provides the official PyTorch implementation of RAP(Regitration 
 
 ---
 # Getting Started
+create a virtual environment
+`python3 -m venv  .venv`
+`. .venv/bin/activate`
+
 test.py
 
 ---

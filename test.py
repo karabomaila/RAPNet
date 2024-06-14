@@ -15,8 +15,8 @@ import shutil
 
 
 
-support_path = r'/workspaces/support'
-global_path = r'/workspaces/global'
+support_path = r'/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized'
+global_path = r'/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized'
 
 
 def MR_normalize(x_in):
@@ -40,8 +40,8 @@ def ts_main(ckpt_path):
     query_root = global_path
     shot = 5
     size = 256
-    all_img_path = glob.glob(query_root+'/*_im.nrrd')
-    all_support_path = glob.glob(support_path+'/*_im.nrrd')
+    all_img_path = glob.glob(query_root+'/*.nii.gz')
+    all_support_path = glob.glob(support_path+'/*.nii.gz')
 
     save_path = './prediction_la_dice_1000'
     if not os.path.exists(save_path):
