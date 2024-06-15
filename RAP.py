@@ -439,6 +439,7 @@ if __name__ == "__main__":
     )
 
     few_shot_model = SDnetSegmentor(net_params)
+    few_shot_model.train()
 
     import torchinfo
 

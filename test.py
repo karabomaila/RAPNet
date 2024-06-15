@@ -30,6 +30,7 @@ def ts_main(ckpt_path):
     common_params, data_params, net_params, train_params, eval_params = settings['COMMON'], settings['DATA'], settings[
         'NETWORK'], settings['TRAINING'], settings['EVAL']
 
+    # initialize and load the trained model
     model = fs.RAP(net_params)
     model.load_state_dict(torch.load(ckpt_path, map_location='cpu')['state_dict'])
     model.cuda()
