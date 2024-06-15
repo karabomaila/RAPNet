@@ -12,11 +12,12 @@ import torch.nn.functional as F
 import RAP as fs
 from settings import Settings
 
-support_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized"
-query_root = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized"
+support_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/image*"
+query_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
 
 SP_SLICES = 3
 IMAGE_SIZE = 256
+SHOTS = 5
 
 def MR_normalize(x_in):
     return x_in / 255
@@ -40,8 +41,7 @@ def ts_main(ckpt_path):
     model.eval()
 
     # some params
-    shot = 5
-    all_query_img_path = glob(query_root + "/*.nii.gz")
+    all_query_img_path = glob(query_path + "/*.nii.gz")
     all_support_img_path = glob(support_path + "/*.nii.gz")
 
     save_path = "./prediction_la_dice_1000"
