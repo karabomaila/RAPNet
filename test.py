@@ -133,12 +133,12 @@ def ts_main(ckpt_path):
                     )
 
                 # every slice a support
-                support_paths = random.sample(tmp_support_path, shot)
+                support_paths = random.sample(tmp_support_path, SHOTS)
                 print("sids:", support_paths)
 
                 sp_imgs = []
                 sp_msks = []
-                for i in range(shot):
+                for i in range(SHOTS):
                     img_support = nrrd.read(support_paths[i])[0].transpose(2, 1, 0)
                     mask_support = (
                         nrrd.read(support_paths[i].replace("_im", "_m"))[0]
@@ -152,7 +152,7 @@ def ts_main(ckpt_path):
                 s_inputs = []
                 s_masks = []
                 cond_inputs = []
-                for i in range(shot):
+                for i in range(SHOTS):
                     img_support = sp_imgs[i]
                     mask_support = sp_msks[i]
                     sp_shp0 = img_support.shape[0]
