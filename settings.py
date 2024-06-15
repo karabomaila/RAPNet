@@ -1,14 +1,14 @@
 import ast
 import configparser  # parse .ini
+import os
+from ast import literal_eval
 from collections.abc import Mapping
 
 import yaml
-import os
-from ast import literal_eval
 
 
 class Settings(Mapping):
-    def __init__(self, setting_file='settings.ini'):
+    def __init__(self, setting_file="settings.ini"):
         config = configparser.ConfigParser()
         config.read(setting_file)
         self.settings_dict = _parse_values(config)
@@ -28,7 +28,9 @@ def _parse_values(config):
     for section in config.sections():
         config_parsed[section] = {}
         for key, value in config[section].items():
-            config_parsed[section][key] = ast.literal_eval(value)  # safer than eval():  string to ori type
+            config_parsed[section][key] = ast.literal_eval(
+                value
+            )  # safer than eval():  string to ori type
     return config_parsed
 
 
@@ -87,10 +89,11 @@ class CfgNode(dict):
 
 def load_cfg_from_cfg_file(file):
     cfg = {}
-    assert os.path.isfile(file) and file.endswith('.yaml'), \
-        '{} is not a yaml file'.format(file)
+    assert os.path.isfile(file) and file.endswith(
+        ".yaml"
+    ), "{} is not a yaml file".format(file)
 
-    with open(file, 'r') as f:
+    with open(file, "r") as f:
         cfg_from_file = yaml.safe_load(f)
 
     # for key in cfg_from_file:
@@ -99,6 +102,7 @@ def load_cfg_from_cfg_file(file):
 
     cfg = CfgNode(cfg_from_file)
     return cfg
+
 
 def _decode_cfg_value(v):
     """Decodes a raw config value (e.g., from a yaml config files or command
@@ -127,5 +131,3 @@ def _decode_cfg_value(v):
     except SyntaxError:
         pass
     return v
-
-
