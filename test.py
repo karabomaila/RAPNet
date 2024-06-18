@@ -12,6 +12,9 @@ import torch.nn.functional as F
 import RAP as fs
 from settings import Settings
 
+images_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/image*"
+label_images_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
+
 support_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/image*"
 query_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
 
