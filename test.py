@@ -3,6 +3,7 @@ import os
 import random
 import shutil
 from glob import glob
+
 import cv2
 import nrrd
 import numpy as np
@@ -13,7 +14,9 @@ import RAP as fs
 from settings import Settings
 
 images_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/image*"
-label_images_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
+label_images_path = (
+    r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
+)
 
 support_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/image*"
 query_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
@@ -21,6 +24,7 @@ query_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/la
 SP_SLICES = 3
 IMAGE_SIZE = 256
 SHOTS = 5
+
 
 def MR_normalize(x_in):
     return x_in / 255
@@ -74,7 +78,6 @@ def ts_main(ckpt_path):
             sp_mask = []
             for query_slice in range(img_query.shape[0]):
                 if SP_SLICES == 1:
-
                     input = cv2.resize(
                         img_query[query_slice],
                         dsize=(IMAGE_SIZE, IMAGE_SIZE),
@@ -98,7 +101,7 @@ def ts_main(ckpt_path):
                     )
                     input = MR_normalize(input)
                     query = torch.from_numpy(input[np.newaxis, np.newaxis, ...]).float()
-                    
+
                     if query_slice == 0:
                         query_pre = query
                     else:

@@ -4,31 +4,29 @@ For Evaluation
 Extended from ADNet code by Hansen et al.
 """
 
-
-import logging
-import torch.nn as nn
-import torch.backends.cudnn as cudnn
-import torch.optim
-from torch.optim.lr_scheduler import MultiStepLR
-from utils import *
-from RAP import RAP
 import copy
-import os
 import random
-import shutil
 from glob import glob
+
 import cv2
 import nrrd
 import numpy as np
 import torch
+import torch.backends.cudnn as cudnn
+import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim
+from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
+
+import load_dataset
 import RAP as fs
 from settings import Settings
-import load_dataset 
 
 images_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/image*"
-label_images_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
+label_images_path = (
+    r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
+)
 
 support_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/image*"
 query_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
@@ -36,6 +34,7 @@ query_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/la
 SP_SLICES = 3
 IMAGE_SIZE = 256
 SHOTS = 5
+
 
 def MR_normalize(x_in):
     return x_in / 255
@@ -58,12 +57,15 @@ def ts_main(ckpt_path):
     model.cuda()
     model.eval()
 
-
     all_images_paths = glob(images_path + "/*.nii.gz")
     all_label_images_paths = glob(label_images_path + "/*.nii.gz")
 
-    all_images_paths = sorted(all_images_paths, key=lambda x: int(x.split('_')[-1].split(".nii.gz")[0]))
-    all_label_images_paths = sorted(all_label_images_paths, key=lambda x: int(x.split('_')[-1].split(".nii.gz")[0]))
+    all_images_paths = sorted(
+        all_images_paths, key=lambda x: int(x.split("_")[-1].split(".nii.gz")[0])
+    )
+    all_label_images_paths = sorted(
+        all_label_images_paths, key=lambda x: int(x.split("_")[-1].split(".nii.gz")[0])
+    )
 
     all_query_img_path = glob(query_path + "/*.nii.gz")
     all_support_img_path = glob(support_path + "/*.nii.gz")
@@ -99,7 +101,6 @@ def ts_main(ckpt_path):
             sp_mask = []
             for query_slice in range(img_query.shape[0]):
                 if SP_SLICES == 1:
-
                     input = cv2.resize(
                         img_query[query_slice],
                         dsize=(IMAGE_SIZE, IMAGE_SIZE),
@@ -123,7 +124,7 @@ def ts_main(ckpt_path):
                     )
                     input = MR_normalize(input)
                     query = torch.from_numpy(input[np.newaxis, np.newaxis, ...]).float()
-                    
+
                     if query_slice == 0:
                         query_pre = query
                     else:
@@ -329,26 +330,23 @@ def ts_main(ckpt_path):
 # ts = ts_main(ckpt_path)
 
 
-
-
-
 def train():
     # if _run.observers:
-        # Set up source folder
-        # os.makedirs(f'{_run.observers[0].dir}/snapshots', exist_ok=True)
-        # for source_file, _ in _run.experiment_info['sources']:
-        #     os.makedirs(os.path.dirname(f'{_run.observers[0].dir}/source/{source_file}'),
-        #                 exist_ok=True)
-        #     _run.observers[0].save_file(source_file, f'source/{source_file}')
-        # shutil.rmtree(f'{_run.observers[0].basedir}/_sources')
+    # Set up source folder
+    # os.makedirs(f'{_run.observers[0].dir}/snapshots', exist_ok=True)
+    # for source_file, _ in _run.experiment_info['sources']:
+    #     os.makedirs(os.path.dirname(f'{_run.observers[0].dir}/source/{source_file}'),
+    #                 exist_ok=True)
+    #     _run.observers[0].save_file(source_file, f'source/{source_file}')
+    # shutil.rmtree(f'{_run.observers[0].basedir}/_sources')
 
-        # # Set up logger -> log to .txt
-        # file_handler = logging.FileHandler(os.path.join(f'{_run.observers[0].dir}', f'logger.log'))
-        # file_handler.setLevel('INFO')
-        # formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
-        # file_handler.setFormatter(formatter)
-        # _log.handlers.append(file_handler)
-        # _log.info(f'Run "{_config["exp_str"]}" with ID "{_run.observers[0].dir[-1]}"')
+    # # Set up logger -> log to .txt
+    # file_handler = logging.FileHandler(os.path.join(f'{_run.observers[0].dir}', f'logger.log'))
+    # file_handler.setLevel('INFO')
+    # formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+    # file_handler.setFormatter(formatter)
+    # _log.handlers.append(file_handler)
+    # _log.info(f'Run "{_config["exp_str"]}" with ID "{_run.observers[0].dir[-1]}"')
 
     # Deterministic setting for reproduciablity.
     # if _config['seed'] is not None:
@@ -361,11 +359,11 @@ def train():
     cudnn.enabled = True
     cudnn.benchmark = True
     print(torch.cuda.is_available())
-    d = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
+    d = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # torch.cuda.set_device(device=0)
     torch.set_num_threads(1)
 
-    print('Create model...')
+    print("Create model...")
     settings = Settings()  # parse .ini
     common_params, data_params, net_params, train_params, eval_params = (
         settings["COMMON"],
@@ -378,66 +376,83 @@ def train():
     # model = model.cuda()
     model.train()
 
-    print(f'Set optimizer...')
+    print("Set optimizer...")
     optim = {
-        'lr': 1e-3,
-        'momentum': 0.9,
-        'weight_decay': 0.0005,
+        "lr": 1e-3,
+        "momentum": 0.9,
+        "weight_decay": 0.0005,
     }
     lr_step_gamma = 0.95
     optimizer = torch.optim.SGD(model.parameters(), **optim)
-    lr_milestones = [(ii + 1) * 1000 for ii in
-                     range(1000 // 1000 - 1)]
+    lr_milestones = [(ii + 1) * 1000 for ii in range(1000 // 1000 - 1)]
     scheduler = MultiStepLR(optimizer, milestones=lr_milestones, gamma=lr_step_gamma)
 
     my_weight = torch.FloatTensor([0.1, 1.0])
     criterion = nn.NLLLoss(ignore_index=255, weight=my_weight)
 
-    print(f'Load data...')
+    print("Load data...")
     data_config = {
-            'n_shot': 1,
-            'n_way': 1,
-            'n_query': 1,
-            'n_sv': 0,
-            'max_iter': 1000,
-            'eval_fold': 0,
-            'min_size': 200,
-            'max_slices': 3,
-            'test_label': [1, 4],
-            'exclude_label': None,
-            'use_gt': True,
-        }
+        "n_shot": 1,
+        "n_way": 1,
+        "n_query": 1,
+        "n_sv": 0,
+        "max_iter": 1000,
+        "eval_fold": 0,
+        "min_size": 200,
+        "max_slices": 3,
+        "test_label": [1, 4],
+        "exclude_label": None,
+        "use_gt": True,
+    }
     train_dataset = load_dataset.TrainDataset(data_config)
-    train_loader = DataLoader(train_dataset,
-                                batch_size=1,
-                                shuffle=True,
-                                num_workers=0,
-                                pin_memory=True,
-                                drop_last=True)
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=1,
+        shuffle=True,
+        num_workers=0,
+        pin_memory=True,
+        drop_last=True,
+    )
 
     n_sub_epochs = 1000 // 1000  # number of times for reloading
-    log_loss = {'total_loss': 0, 'query_loss': 0, 'align_loss': 0}
+    log_loss = {"total_loss": 0, "query_loss": 0, "align_loss": 0}
 
     i_iter = 0
-    print(f'Start training...')
+    print("Start training...")
     for sub_epoch in range(n_sub_epochs):
         print(f'This is epoch "{sub_epoch}" of "{n_sub_epochs}" epochs.')
         for _, sample in enumerate(train_loader):
             # Prepare episode data.
             print(sample)
-            support_images = [[shot.float() for shot in way]
-                              for way in sample['support_images']]
-            support_fg_mask = [[shot.float() for shot in way]
-                               for way in sample['support_fg_labels']]
+            support_images = [
+                [shot.float() for shot in way] for way in sample["support_images"]
+            ]
+            support_fg_mask = [
+                [shot.float() for shot in way] for way in sample["support_fg_labels"]
+            ]
 
-            query_images = [query_image.float() for query_image in sample['query_images']]
-            query_labels = torch.cat([query_label.long() for query_label in sample['query_labels']], dim=0)
+            query_images = [
+                query_image.float() for query_image in sample["query_images"]
+            ]
+            query_labels = torch.cat(
+                [query_label.long() for query_label in sample["query_labels"]], dim=0
+            )
 
             # Compute outputs and losses.
-            query_pred, align_loss = model(query_images, support_images, support_fg_mask)
+            query_pred, align_loss = model(
+                query_images, support_images, support_fg_mask
+            )
 
-            query_loss = criterion(torch.log(torch.clamp(query_pred, torch.finfo(torch.float32).eps,
-                                                         1 - torch.finfo(torch.float32).eps)), query_labels)
+            query_loss = criterion(
+                torch.log(
+                    torch.clamp(
+                        query_pred,
+                        torch.finfo(torch.float32).eps,
+                        1 - torch.finfo(torch.float32).eps,
+                    )
+                ),
+                query_labels,
+            )
             loss = query_loss + align_loss
 
             # Compute gradient and do SGD step.
@@ -456,32 +471,36 @@ def train():
             # _run.log_scalar('query_loss', query_loss)
             # _run.log_scalar('align_loss', align_loss)
 
-            log_loss['total_loss'] += loss.item()
-            log_loss['query_loss'] += query_loss
-            log_loss['align_loss'] += align_loss
+            log_loss["total_loss"] += loss.item()
+            log_loss["query_loss"] += query_loss
+            log_loss["align_loss"] += align_loss
 
             # Print loss and take snapshots.
-            if (i_iter + 1) %  100 == 0:
-                total_loss = log_loss['total_loss'] / 100
-                query_loss = log_loss['query_loss'] / 100
-                align_loss = log_loss['align_loss'] / 100
+            if (i_iter + 1) % 100 == 0:
+                total_loss = log_loss["total_loss"] / 100
+                query_loss = log_loss["query_loss"] / 100
+                align_loss = log_loss["align_loss"] / 100
 
-                log_loss['total_loss'] = 0
-                log_loss['query_loss'] = 0
-                log_loss['align_loss'] = 0
+                log_loss["total_loss"] = 0
+                log_loss["query_loss"] = 0
+                log_loss["align_loss"] = 0
 
-                print(f'step {i_iter + 1}: total_loss: {total_loss}, query_loss: {query_loss},'
-                          f' align_loss: {align_loss}')
+                print(
+                    f"step {i_iter + 1}: total_loss: {total_loss}, query_loss: {query_loss},"
+                    f" align_loss: {align_loss}"
+                )
 
             if (i_iter + 1) % 1000 == 0:
-                print('###### Taking snapshot ######')
-                torch.save(model.state_dict(),
-                           f"/home/karabo/code/Few-shot/data/{i_iter + 1}model.pth"
-                           )
+                print("###### Taking snapshot ######")
+                torch.save(
+                    model.state_dict(),
+                    f"/home/karabo/code/Few-shot/data/{i_iter + 1}model.pth",
+                )
 
             i_iter += 1
-    print('End of training.')
+    print("End of training.")
     return 1
+
 
 if __name__ == "__main__":
     train()
