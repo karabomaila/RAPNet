@@ -23,7 +23,7 @@ query_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/la
 
 SP_SLICES = 3
 IMAGE_SIZE = 256
-SHOTS = 5
+SHOTS = 1
 
 
 def MR_normalize(x_in):
@@ -33,14 +33,15 @@ def MR_normalize(x_in):
 def ts_main(ckpt_path) -> None:
     print("running?")
     settings = Settings()  # parse .ini
-    common_params, data_params, net_params, train_params, eval_params = (
-        settings["COMMON"],
-        settings["DATA"],
-        settings["NETWORK"],
-        settings["TRAINING"],
-        settings["EVAL"],
-    )
+    # _, data_params, net_params, train_params, eval_params = (
+    #     settings["COMMON"],
+    #     settings["DATA"],
+    #     settings["NETWORK"],
+    #     settings["TRAINING"],
+    #     settings["EVAL"],
+    # )
 
+    net_params = settings["NETWORK"]
     # initialize and load the trained model
     model = fs.RAP(net_params)
     model.load_state_dict(torch.load(ckpt_path, map_location="cpu")["state_dict"])
@@ -67,7 +68,7 @@ def ts_main(ckpt_path) -> None:
             img_query = nrrd.read(pid)[0].transpose(2, 1, 0)
             mask_query = nrrd.read(pid.replace("im", "m"))[0].transpose(2, 1, 0)
 
-            tmp_support_path = copy.deepcopy(all_support_img_path)
+            tmp_support_path: list[str] = copy.deepcopy(all_support_img_path)
             try:
                 tmp_support_path.remove(pid)
             except:
@@ -142,8 +143,9 @@ def ts_main(ckpt_path) -> None:
                 support_paths: list[str] = random.sample(tmp_support_path, SHOTS)
                 print("sids:", support_paths)
 
+                # read in the sampled support images
                 sp_imgs = []
-                sp_msks = []
+                sp_masks = []
                 for i in range(SHOTS):
                     img_support = nrrd.read(support_paths[i])[0].transpose(2, 1, 0)
                     mask_support = (
@@ -151,15 +153,16 @@ def ts_main(ckpt_path) -> None:
                         .transpose(2, 1, 0)
                         .astype(np.uint8)
                     )
+
                     sp_imgs.append(img_support)
-                    sp_msks.append(mask_support)
+                    sp_masks.append(mask_support)
 
                 # get cur_slice support
                 s_inputs = []
                 s_masks = []
                 for i in range(SHOTS):
                     img_support = sp_imgs[i]
-                    mask_support = sp_msks[i]
+                    mask_support = sp_masks[i]
                     sp_shp0 = img_support.shape[0]
 
                     if SP_SLICES == 1:
