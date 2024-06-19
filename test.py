@@ -30,7 +30,7 @@ def MR_normalize(x_in):
     return x_in / 255
 
 
-def ts_main(ckpt_path):
+def ts_main(ckpt_path) -> None:
     print("running?")
     settings = Settings()  # parse .ini
     common_params, data_params, net_params, train_params, eval_params = (
@@ -48,8 +48,8 @@ def ts_main(ckpt_path):
     model.eval()
 
     # some params
-    all_query_img_path = glob(query_path + "/*.nii.gz")
-    all_support_img_path = glob(support_path + "/*.nii.gz")
+    all_query_img_path: list[str] = glob(query_path + "/*.nii.gz")
+    all_support_img_path: list[str] = glob(support_path + "/*.nii.gz")
 
     save_path = "./prediction_la_dice_1000"
     if not os.path.exists(save_path):
@@ -139,7 +139,7 @@ def ts_main(ckpt_path):
                     )
 
                 # every slice a support
-                support_paths = random.sample(tmp_support_path, SHOTS)
+                support_paths: list[str] = random.sample(tmp_support_path, SHOTS)
                 print("sids:", support_paths)
 
                 sp_imgs = []
@@ -157,7 +157,6 @@ def ts_main(ckpt_path):
                 # get cur_slice support
                 s_inputs = []
                 s_masks = []
-                cond_inputs = []
                 for i in range(SHOTS):
                     img_support = sp_imgs[i]
                     mask_support = sp_msks[i]
@@ -212,11 +211,12 @@ def ts_main(ckpt_path):
                         # S3
                         sp_index = int(query_slice / img_query.shape[0] * sp_shp0)
 
-                        sp_indexes = [
+                        sp_indexes: list[int] = [
                             max(sp_index - 1, 0),
                             sp_index,
                             min(sp_index + 1, sp_shp0 - 1),
                         ]
+
                         sp_imgs_tmp = []
                         sp_masks_tmp = []
                         for sp_index in sp_indexes:
@@ -226,6 +226,7 @@ def ts_main(ckpt_path):
                                 interpolation=cv2.INTER_LINEAR,
                             )
                             img_support_r = MR_normalize(img_support_r)
+
                             s_input = (
                                 torch.from_numpy(
                                     img_support_r[
@@ -263,7 +264,7 @@ def ts_main(ckpt_path):
                 s_input = torch.cat(s_inputs, 1)  # 1, Kshot, slice, h, w
                 s_mask = torch.cat(s_masks, 1)
 
-                # # run model
+                # run model
                 support = torch.cat([s_input, s_mask], 2)  # b, Kshot, slice*2, h, w
                 cond_inputs_ = support.permute(1, 0, 2, 3, 4)  # Kshot, b, slice*2, h, w
 
