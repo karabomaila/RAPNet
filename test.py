@@ -80,31 +80,17 @@ def ts_main(ckpt_path) -> None:
             tmp_sprior = []
             sp_mask = []
             for query_slice in range(img_query.shape[0]):
-                if SP_SLICES == 1:
-                    input = cv2.resize(
-                        img_query[query_slice],
-                        dsize=(IMAGE_SIZE, IMAGE_SIZE),
-                        interpolation=cv2.INTER_LINEAR,
-                    )
-                    input = MR_normalize(input)
-                    # 3 or 1 channel input
-                    # input = torch.from_numpy(np.repeat(input[np.newaxis, np.newaxis, ...], 3, 1)).float().cuda()
-                    query = (
-                        torch.from_numpy(input[np.newaxis, np.newaxis, ...])
-                        .float()
-                        .cuda()
-                    )
+                input = cv2.resize(
+                    img_query[query_slice],
+                    dsize=(IMAGE_SIZE, IMAGE_SIZE),
+                    interpolation=cv2.INTER_LINEAR,
+                )
+                input = MR_normalize(input)
+                # 3 or 1 channel input
+                # input = torch.from_numpy(np.repeat(input[np.newaxis, np.newaxis, ...], 3, 1)).float().cuda()
+                query = torch.from_numpy(input[np.newaxis, np.newaxis, ...]).float()
 
-                else:
-                    # sp_slices == 3
-                    input = cv2.resize(
-                        img_query[query_slice],
-                        dsize=(IMAGE_SIZE, IMAGE_SIZE),
-                        interpolation=cv2.INTER_LINEAR,
-                    )
-                    input = MR_normalize(input)
-                    query = torch.from_numpy(input[np.newaxis, np.newaxis, ...]).float()
-
+                if SP_SLICES == 3:
                     if query_slice == 0:
                         query_pre = query
                     else:
@@ -133,7 +119,7 @@ def ts_main(ckpt_path) -> None:
                             input[np.newaxis, np.newaxis, ...]
                         ).float()
 
-                    # finish read query img(1 or 3 slices) and mask (1 slice)
+                    # finish reading query img(1 or 3 slices) and mask (1 slice)
                     query = torch.cat([query_pre, query, query_next], dim=1).cuda()
                     mask_query = cv2.resize(
                         mask_query[query_slice],
@@ -165,7 +151,7 @@ def ts_main(ckpt_path) -> None:
                 for i in range(SHOTS):
                     img_support = sp_imgs[i]
                     mask_support = sp_masks[i]
-                    sp_shp0 = img_support.shape[0]
+                    sp_shp0: int = img_support.shape[0]
 
                     if SP_SLICES == 1:
                         sp_index = int(
