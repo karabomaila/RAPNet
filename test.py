@@ -42,6 +42,7 @@ def ts_main(ckpt_path) -> None:
     # )
 
     net_params = settings["NETWORK"]
+
     # initialize and load the trained model
     model = fs.RAP(net_params)
     model.load_state_dict(torch.load(ckpt_path, map_location="cpu")["state_dict"])
@@ -65,6 +66,7 @@ def ts_main(ckpt_path) -> None:
             print("qid:", pid)
             query_name = pid.split("\\")[-1].split(".")[0]
 
+            # read in the query image and its mask
             img_query = nrrd.read(pid)[0].transpose(2, 1, 0)
             mask_query = nrrd.read(pid.replace("im", "m"))[0].transpose(2, 1, 0)
 
