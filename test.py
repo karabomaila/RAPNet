@@ -32,7 +32,7 @@ def MR_normalize(x_in):
 
 def ts_main(ckpt_path) -> None:
     print("running?")
-    settings = Settings()  # parse .ini
+    settings = Settings()
     # _, data_params, net_params, train_params, eval_params = (
     #     settings["COMMON"],
     #     settings["DATA"],
@@ -43,13 +43,6 @@ def ts_main(ckpt_path) -> None:
 
     net_params = settings["NETWORK"]
 
-    # initialize and load the trained model
-    model = fs.RAP(net_params)
-    model.load_state_dict(torch.load(ckpt_path, map_location="cpu")["state_dict"])
-    model.cuda()
-    model.eval()
-
-    # some params
     all_query_img_path: list[str] = glob(query_path + "/*.nii.gz")
     all_support_img_path: list[str] = glob(support_path + "/*.nii.gz")
 
@@ -59,6 +52,12 @@ def ts_main(ckpt_path) -> None:
     else:
         shutil.rmtree(save_path)
         os.mkdir(save_path)
+
+    # initialize and load the trained model
+    model = fs.RAP(net_params)
+    model.load_state_dict(torch.load(ckpt_path, map_location="cpu")["state_dict"])
+    model.cuda()
+    model.eval()
 
     # data flow and pred
     with torch.no_grad():
@@ -73,7 +72,7 @@ def ts_main(ckpt_path) -> None:
             tmp_support_path: list[str] = copy.deepcopy(all_support_img_path)
             try:
                 tmp_support_path.remove(pid)
-            except:
+            except Exception:
                 pass
 
             pred_mask = []
@@ -153,11 +152,11 @@ def ts_main(ckpt_path) -> None:
                     mask_support = sp_masks[i]
                     sp_shp0: int = img_support.shape[0]
 
-                    if SP_SLICES == 1:
-                        sp_index = int(
-                            query_slice / img_query.shape[0] * img_support.shape[0]
-                        )
+                    sp_index = int(
+                        query_slice / img_query.shape[0] * img_support.shape[0]
+                    )
 
+                    if SP_SLICES == 1:
                         img_support = cv2.resize(
                             img_support[sp_index],
                             dsize=(IMAGE_SIZE, IMAGE_SIZE),
@@ -165,30 +164,19 @@ def ts_main(ckpt_path) -> None:
                         )
 
                         img_support = MR_normalize(img_support)
-                        s_input = (
-                            torch.from_numpy(
-                                img_support[np.newaxis, np.newaxis, np.newaxis, ...]
-                            )
-                            .float()
-                            .cuda()
-                        )
+                        s_input = torch.from_numpy(
+                            img_support[np.newaxis, np.newaxis, np.newaxis, ...]
+                        ).float()
 
                         msk_support = cv2.resize(
                             mask_support[sp_index],
                             dsize=(IMAGE_SIZE, IMAGE_SIZE),
                             interpolation=cv2.INTER_NEAREST,
                         )
-                        s_mask = (
-                            torch.from_numpy(
-                                msk_support[np.newaxis, np.newaxis, np.newaxis, ...]
-                            )
-                            .float()
-                            .cuda()
-                        )
+                        s_mask = torch.from_numpy(
+                            msk_support[np.newaxis, np.newaxis, np.newaxis, ...]
+                        ).float()
                     else:
-                        # S1
-                        # sp_index = sp_shp0//2
-
                         # S2
                         # bias = sp_shp0 / 3 / 2
                         # ratio = query_slice / img_query.shape[0]
@@ -199,15 +187,12 @@ def ts_main(ckpt_path) -> None:
                         # else:
                         #     sp_index = int(2 / 3 * sp_shp0 + bias)
 
-                        # S3
-                        sp_index = int(query_slice / img_query.shape[0] * sp_shp0)
-
                         sp_indexes: list[int] = [
                             max(sp_index - 1, 0),
                             sp_index,
                             min(sp_index + 1, sp_shp0 - 1),
                         ]
-
+                        # reading the previous, current and the next support slices
                         sp_imgs_tmp = []
                         sp_masks_tmp = []
                         for sp_index in sp_indexes:
@@ -218,15 +203,10 @@ def ts_main(ckpt_path) -> None:
                             )
                             img_support_r = MR_normalize(img_support_r)
 
-                            s_input = (
-                                torch.from_numpy(
-                                    img_support_r[
-                                        np.newaxis, np.newaxis, np.newaxis, ...
-                                    ]
-                                )
-                                .float()
-                                .cuda()
-                            )
+                            s_input = torch.from_numpy(
+                                img_support_r[np.newaxis, np.newaxis, np.newaxis, ...]
+                            ).float()
+
                             sp_imgs_tmp.append(s_input)
                             msk_support = (
                                 cv2.resize(
@@ -236,15 +216,13 @@ def ts_main(ckpt_path) -> None:
                                 )
                                 == 1
                             )
-                            s_mask = (
-                                torch.from_numpy(
-                                    msk_support[np.newaxis, np.newaxis, np.newaxis, ...]
-                                )
-                                .float()
-                                .cuda()
-                            )
+
+                            s_mask = torch.from_numpy(
+                                msk_support[np.newaxis, np.newaxis, np.newaxis, ...]
+                            ).float()
                             sp_masks_tmp.append(s_mask)
 
+                        # add or combine all the slices
                         s_input = torch.cat(sp_imgs_tmp, 2)  # [1,1,slice,H,W]
                         s_mask = torch.cat(sp_masks_tmp, 2)  # [1,1,slice,H,W]
 

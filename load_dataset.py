@@ -2,33 +2,42 @@
 Dataset for Training and Test
 Extended from ADNet code by Hansen et al.
 """
-import torch
-from torch.utils.data import Dataset
-import torchvision.transforms as deftfx
+
 import glob
 import os
-import SimpleITK as sitk
 import random
+
 import numpy as np
+import SimpleITK as sitk
+import torch
+import torchvision.transforms as deftfx
+from torch.utils.data import Dataset
+
 import image_transforms as myit
 
-
 images_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/image*"
-label_images_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
+label_images_path = (
+    r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
+)
+
 
 class TestDataset(Dataset):
-
     def __init__(self, args):
-
         # reading the paths
-        if args['dataset'] == 'CMR':
-            self.image_dirs = glob.glob(os.path.join(args['data_dir'], 'cmr_MR_normalized/image*'))
-        elif args['dataset'] == 'CHAOST2':
-            self.image_dirs = glob.glob(os.path.join(args['data_dir'], 'chaos_MR_T2_normalized/image*'))
+        if args["dataset"] == "CMR":
+            self.image_dirs = glob.glob(
+                os.path.join(args["data_dir"], "cmr_MR_normalized/image*")
+            )
+        elif args["dataset"] == "CHAOST2":
+            self.image_dirs = glob.glob(
+                os.path.join(args["data_dir"], "chaos_MR_T2_normalized/image*")
+            )
         # elif args['dataset'] == 'SABS':
         #     self.image_dirs = glob.glob(os.path.join(args['data_dir'], 'sabs_CT_normalized/image*'))
 
-        self.image_dirs = sorted(self.image_dirs, key=lambda x: int(x.split('_')[-1].split('.nii.gz')[0]))
+        self.image_dirs = sorted(
+            self.image_dirs, key=lambda x: int(x.split("_")[-1].split(".nii.gz")[0])
+        )
 
         # remove test fold!
         # self.FOLD = get_folds(args['dataset'])
@@ -36,34 +45,36 @@ class TestDataset(Dataset):
 
         # split into support/query
         idx = np.arange(len(self.image_dirs))
-        self.support_dir = self.image_dirs[idx[args['supp_idx']]]
-        self.image_dirs.pop(idx[args['supp_idx']])  # remove support
+        self.support_dir = self.image_dirs[idx[args["supp_idx"]]]
+        self.image_dirs.pop(idx[args["supp_idx"]])  # remove support
         self.label = None
 
     def __len__(self):
         return len(self.image_dirs)
 
     def __getitem__(self, idx):
-
         img_path = self.image_dirs[idx]
         img = sitk.GetArrayFromImage(sitk.ReadImage(img_path))
         img = (img - img.mean()) / img.std()
         img = np.stack(3 * [img], axis=1)
 
         lbl = sitk.GetArrayFromImage(
-            sitk.ReadImage(img_path.split('image_')[0] + 'label_' + img_path.split('image_')[-1]))
+            sitk.ReadImage(
+                img_path.split("image_")[0] + "label_" + img_path.split("image_")[-1]
+            )
+        )
         lbl[lbl == 200] = 1
         lbl[lbl == 500] = 2
         lbl[lbl == 600] = 3
         lbl = 1 * (lbl == self.label)
 
-        sample = {'id': img_path}
+        sample = {"id": img_path}
 
         # Evaluation protocol.
         idx = lbl.sum(axis=(1, 2)) > 0
-        sample['image'] = torch.from_numpy(img[idx])
-        sample['label'] = torch.from_numpy(lbl[idx])
-        #sample['padding_mask'] = np.zeros_like(sample['label'])
+        sample["image"] = torch.from_numpy(img[idx])
+        sample["label"] = torch.from_numpy(lbl[idx])
+        # sample['padding_mask'] = np.zeros_like(sample['label'])
         return sample
 
     def get_support_index(self, n_shot, C):
@@ -77,11 +88,11 @@ class TestDataset(Dataset):
             part_interval = (1.0 - 1.0 / n_shot) / (n_shot - 1)
             pcts = [half_part + part_interval * ii for ii in range(n_shot)]
 
-        return (np.array(pcts) * C).astype('int')
+        return (np.array(pcts) * C).astype("int")
 
     def getSupport(self, label=None, all_slices=True, N=None):
         if label is None:
-            raise ValueError('Need to specify label class!')
+            raise ValueError("Need to specify label class!")
 
         img_path = self.support_dir
         img = sitk.GetArrayFromImage(sitk.ReadImage(img_path))
@@ -89,7 +100,10 @@ class TestDataset(Dataset):
         img = np.stack(3 * [img], axis=1)
 
         lbl = sitk.GetArrayFromImage(
-            sitk.ReadImage(img_path.split('image_')[0] + 'label_' + img_path.split('image_')[-1]))
+            sitk.ReadImage(
+                img_path.split("image_")[0] + "label_" + img_path.split("image_")[-1]
+            )
+        )
         lbl[lbl == 200] = 1
         lbl[lbl == 500] = 2
         lbl[lbl == 600] = 3
@@ -97,53 +111,56 @@ class TestDataset(Dataset):
 
         sample = {}
         if all_slices:
-            sample['image'] = torch.from_numpy(img)
-            sample['label'] = torch.from_numpy(lbl)
+            sample["image"] = torch.from_numpy(img)
+            sample["label"] = torch.from_numpy(lbl)
         else:
             # select N labeled slices
             if N is None:
-                raise ValueError('Need to specify number of labeled slices!')
+                raise ValueError("Need to specify number of labeled slices!")
             idx = lbl.sum(axis=(1, 2)) > 0
             idx_ = self.get_support_index(N, idx.sum())
 
-            sample['image'] = torch.from_numpy(img[idx][idx_])
-            sample['label'] = torch.from_numpy(lbl[idx][idx_])
+            sample["image"] = torch.from_numpy(img[idx][idx_])
+            sample["label"] = torch.from_numpy(lbl[idx][idx_])
 
         return sample
 
 
 class TrainDataset(Dataset):
-
-    def __init__(self, args):
-        self.n_shot = args['n_shot']
-        self.n_way = args['n_way']
-        self.n_query = args['n_query']
-        self.n_sv = args['n_sv']
-        self.max_iter = args['max_iter']
+    def __init__(self, args) -> None:
+        self.n_shot: int = args["n_shot"]
+        self.n_way: int = args["n_way"]
+        self.n_query: int = args["n_query"]
+        self.n_sv = args["n_sv"]
+        self.max_iter: int = args["max_iter"]
         self.read = True  # read images before get_item
-        self.train_sampling = 'neighbors'
-        self.min_size = args['min_size']
-        self.test_label = args['test_label']
-        self.exclude_label = args['exclude_label']
-        self.use_gt = args['use_gt']
-        self.label_dirs = None
+        self.train_sampling = "neighbors"
+        self.min_size = args["min_size"]
+        self.test_label = args["test_label"]
+        self.exclude_label: None | list = args["exclude_label"]
+        self.use_gt = args["use_gt"]
+        # self.label_dirs = None
 
         # reading the paths (leaving the reading of images into memory to __getitem__)
         # if args['dataset'] == 'CMR':
 
         self.image_dirs = glob.glob(images_path)
         self.label_dirs = glob.glob(label_images_path)
-        
+
         # elif args['dataset'] == 'CHAOST2':
         #     self.image_dirs = glob.glob(os.path.join(args['data_dir'], 'CT*'))
-            # self.label_dirs = glob.glob(os.path.join(args['data_dir'], 'chaos_MR_T2_normalized/label*'))
+        # self.label_dirs = glob.glob(os.path.join(args['data_dir'], 'chaos_MR_T2_normalized/label*'))
         # elif args['dataset'] == 'SABS':
         #     self.image_dirs = glob.glob(os.path.join(args['data_dir'], 'sabs_CT_normalized/image*'))
         #     self.label_dirs = glob.glob(os.path.join(args['data_dir'], 'sabs_CT_normalized/label*'))
 
-        self.image_dirs = sorted(self.image_dirs, key=lambda x: int(x.split('_')[-1].split('.nii.gz')[0]))
-        self.label_dirs = sorted(self.label_dirs, key=lambda x: int(x.split('_')[-1].split('.nii.gz')[0]))
-        
+        self.image_dirs: list[str] = sorted(
+            self.image_dirs, key=lambda x: int(x.split("_")[-1].split(".nii.gz")[0])
+        )
+        self.label_dirs: list[str] = sorted(
+            self.label_dirs, key=lambda x: int(x.split("_")[-1].split(".nii.gz")[0])
+        )
+
         # self.sprvxl_dirs = glob.glob(os.path.join(args['data_dir'], 'supervoxels_' + str(args['n_sv']), 'super*'))
         # self.sprvxl_dirs = sorted(self.sprvxl_dirs, key=lambda x: int(x.split('_')[-1].split('.nii.gz')[0]))
 
@@ -160,18 +177,24 @@ class TrainDataset(Dataset):
             self.labels = {}
             self.sprvxls = {}
             for image_dir, label_dir in zip(self.image_dirs, self.label_dirs):
-                self.images[image_dir] = sitk.GetArrayFromImage(sitk.ReadImage(image_dir))
-                self.labels[label_dir] = sitk.GetArrayFromImage(sitk.ReadImage(label_dir))
+                self.images[image_dir] = sitk.GetArrayFromImage(
+                    sitk.ReadImage(image_dir)
+                )
+                self.labels[label_dir] = sitk.GetArrayFromImage(
+                    sitk.ReadImage(label_dir)
+                )
                 # self.sprvxls[sprvxl_dir] = sitk.GetArrayFromImage(sitk.ReadImage(sprvxl_dir))
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.max_iter
 
     def gamma_tansform(self, img):
-        gamma_range = (0.5, 1.5)
-        gamma = np.random.rand() * (gamma_range[1] - gamma_range[0]) + gamma_range[0]
-        cmin = img.min()
-        irange = (img.max() - cmin + 1e-5)
+        gamma_range: tuple[float, float] = (0.5, 1.5)
+        gamma: float = (
+            np.random.rand() * (gamma_range[1] - gamma_range[0]) + gamma_range[0]
+        )
+        cmin: float = img.min()
+        irange = img.max() - cmin + 1e-5
 
         img = img - cmin + 1e-5
         img = irange * np.power(img * 1.0 / irange, gamma)
@@ -180,19 +203,23 @@ class TrainDataset(Dataset):
         return img
 
     def geom_transform(self, img, mask):
-
-        affine = {'rotate': 5, 'shift': (5, 5), 'shear': 5, 'scale': (0.9, 1.2)}
+        affine = {"rotate": 5, "shift": (5, 5), "shear": 5, "scale": (0.9, 1.2)}
         alpha = 10
         sigma = 5
         order = 3
 
         tfx = []
-        tfx.append(myit.RandomAffine(affine.get('rotate'),
-                                     affine.get('shift'),
-                                     affine.get('shear'),
-                                     affine.get('scale'),
-                                     affine.get('scale_iso', True),
-                                     order=order))
+        tfx.append(
+            myit.RandomAffine(
+                affine.get("rotate"),
+                affine.get("shift"),
+                affine.get("shear"),
+                affine.get("scale"),
+                affine.get("scale_iso", True),
+                order=order,
+            )
+        )
+
         tfx.append(myit.ElasticTransform(alpha, sigma))
         transform = deftfx.Compose(tfx)
 
@@ -213,9 +240,12 @@ class TrainDataset(Dataset):
 
         return img, mask
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int):
+        """
+        Read a random patient image slices and label slices from the training dataset.
+        """
         # sample patient idx
-        pat_idx = random.choice(range(len(self.image_dirs)))
+        pat_idx: int = random.choice(range(len(self.image_dirs)))
 
         if self.read:
             # get image/supervoxel volume from dictionary
@@ -233,11 +263,16 @@ class TrainDataset(Dataset):
             padding_mask_gt = np.zeros_like(gt)
             # padding_mask_gt_sprvxl = np.zeros_like(sprvxl)
 
-        if self.exclude_label is not None:  # identify the slices containing test labels
+        # identify the slices containing test labels
+        # 1 for Liver, 2 for RK, 3 for LK, 4 for Spleen in 'CHAOST2'
+        if self.exclude_label is not None:
             idx = np.arange(gt.shape[0])
             exclude_idx = np.full(gt.shape[0], True, dtype=bool)
+
             for i in range(len(self.exclude_label)):
-                exclude_idx = exclude_idx & (np.sum(gt == self.exclude_label[i], axis=(1, 2)) > 0)
+                exclude_idx = exclude_idx & (
+                    np.sum(gt == self.exclude_label[i], axis=(1, 2)) > 0
+                )
             exclude_idx = idx[exclude_idx]
         else:
             exclude_idx = []
@@ -257,22 +292,29 @@ class TrainDataset(Dataset):
         unique.remove(0)
 
         # if self.use_gt:
+        # remove the test label from the training data
         unique = list(set(unique) - set(self.test_label))
 
         size = 0
         while size < self.min_size:
             n_slices = (self.n_shot * self.n_way) + self.n_query - 1
+
             while n_slices < ((self.n_shot * self.n_way) + self.n_query):
-                cls_idx = random.choice(unique)
+                cls_idx: int = random.choice(unique)
 
                 # extract slices containing the sampled class
                 sli_idx = np.sum(lbl == cls_idx, axis=(1, 2)) > 0
-                idx = np.arange(lbl.shape[0])
-                sli_idx = idx[sli_idx]
-                sli_idx = list(set(sli_idx) - set(np.intersect1d(sli_idx, exclude_idx))) # remove slices containing test labels
-                n_slices = len(sli_idx)
 
-            # generate possible subsets with successive slices (size = self.n_shot * self.n_way + self.n_query)
+                idx = np.arange(lbl.shape[0])
+
+                sli_idx = idx[sli_idx]
+
+                # remove slices containing test labels
+                sli_idx = list(set(sli_idx) - set(np.intersect1d(sli_idx, exclude_idx)))
+
+                n_slices: int = len(sli_idx)
+
+            # generate possible subsets with successive slices (size = self.n_way * self.n_shot + self.n_query)
             subsets = []
             for i in range(len(sli_idx)):
                 if not subsets:
@@ -281,18 +323,26 @@ class TrainDataset(Dataset):
                     subsets[-1].append(sli_idx[i])
                 else:
                     subsets.append([sli_idx[i]])
+
+            # if there are too many slices, reduce the slices
             i = 0
             while i < len(subsets):
                 if len(subsets[i]) < (self.n_shot * self.n_way + self.n_query):
                     del subsets[i]
                 else:
                     i += 1
+
             if not len(subsets):
-                return self.__getitem__(idx + np.random.randint(low=0, high=self.max_iter - 1, size=(1,)))
+                return self.__getitem__(
+                    idx + np.random.randint(low=0, high=self.max_iter - 1, size=(1,))
+                )
 
             # sample support and query slices
             i = random.choice(np.arange(len(subsets)))  # subset index
-            i = random.choice(subsets[i][:-(self.n_shot * self.n_way + self.n_query - 1)])
+            i = random.choice(
+                subsets[i][: -(self.n_shot * self.n_way + self.n_query - 1)]
+            )
+
             sample = np.arange(i, i + (self.n_shot * self.n_way) + self.n_query)
 
             lbl_cls = 1 * (lbl == cls_idx)
@@ -303,17 +353,23 @@ class TrainDataset(Dataset):
         if np.random.random(1) > 0.5:
             sample = sample[::-1]  # successive slices (inverted)
 
-        sup_lbl = lbl_cls[sample[:self.n_shot * self.n_way]][None,]  # n_way * (n_shot * C) * H * W
-        qry_lbl = lbl_cls[sample[self.n_shot * self.n_way:]]  # n_qry * C * H * W
+        # n_way * (n_shot * C) * H * W
+        sup_lbl = lbl_cls[sample[: self.n_shot * self.n_way]][None,]
 
-        sup_img = img[sample[:self.n_shot * self.n_way]][None,]  # n_way * (n_shot * C) * H * W
+        # n_qry * C * H * W
+        qry_lbl = lbl_cls[sample[self.n_shot * self.n_way :]]
+
+        # n_way * (n_shot * C) * H * W
+        sup_img = img[sample[: self.n_shot * self.n_way]][None,]
         sup_img = np.stack((sup_img, sup_img, sup_img), axis=2)
 
-        qry_img = img[sample[self.n_shot * self.n_way:]]  # n_qry * C * H * W
+        # n_qry * C * H * W
+        qry_img = img[sample[self.n_shot * self.n_way :]]
         qry_img = np.stack((qry_img, qry_img, qry_img), axis=1)
-        
+
         padding_mask = np.zeros_like(qry_lbl)
         s_padding_mask = np.zeros_like(sup_lbl)
+
         # gamma transform
         if np.random.random(1) > 0.5:
             qry_img = self.gamma_tansform(qry_img)
@@ -324,15 +380,18 @@ class TrainDataset(Dataset):
         if np.random.random(1) > 0.5:
             qry_img, qry_lbl = self.geom_transform(qry_img, qry_lbl)
         else:
-            sup_img, sup_lbl, = self.geom_transform(sup_img, sup_lbl)
+            (
+                sup_img,
+                sup_lbl,
+            ) = self.geom_transform(sup_img, sup_lbl)
 
-        sample = {'support_images': sup_img,
-                  'support_fg_labels': sup_lbl,
-                  'query_images': qry_img,
-                  'query_labels': qry_lbl,
-                 'padding_mask': padding_mask,
-                 's_padding_mask': s_padding_mask
-                  }
+        sample = {
+            "support_images": sup_img,
+            "support_fg_labels": sup_lbl,
+            "query_images": qry_img,
+            "query_labels": qry_lbl,
+            "padding_mask": padding_mask,
+            "s_padding_mask": s_padding_mask,
+        }
         return sample
         # return sup_img, sup_lbl, qry_img, qry_lbl, padding_mask, s_padding_mask
-    

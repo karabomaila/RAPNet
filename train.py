@@ -5,6 +5,7 @@ Extended from ADNet code by Hansen et al.
 """
 
 import copy
+import os
 import random
 from glob import glob
 
@@ -350,6 +351,14 @@ def train():
 
     # Deterministic setting for reproduciablity.
     # if _config['seed'] is not None:
+
+    save_path = "./prediction_la_dice_1000"
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
+    # else:
+    #     shutil.rmtree(save_path)
+    #     os.mkdir(save_path)
+
     random.seed(0)
     torch.manual_seed(0)
     torch.cuda.manual_seed_all(0)
@@ -377,14 +386,17 @@ def train():
     model.train()
 
     print("Set optimizer...")
-    optim = {
+    optim: dict[str, float] = {
         "lr": 1e-3,
         "momentum": 0.9,
         "weight_decay": 0.0005,
     }
     lr_step_gamma = 0.95
+    # set optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr_step_gamma)
     optimizer = torch.optim.SGD(model.parameters(), **optim)
-    lr_milestones = [(ii + 1) * 1000 for ii in range(1000 // 1000 - 1)]
+    lr_milestones: list[int] = [(ii + 1) * 1000 for ii in range(1000 // 1000 - 1)]
+
     scheduler = MultiStepLR(optimizer, milestones=lr_milestones, gamma=lr_step_gamma)
 
     my_weight = torch.FloatTensor([0.1, 1.0])
@@ -401,9 +413,10 @@ def train():
         "min_size": 200,
         "max_slices": 3,
         "test_label": [1, 4],
-        "exclude_label": None,
+        "exclude_label": [1, 4],
         "use_gt": True,
     }
+
     train_dataset = load_dataset.TrainDataset(data_config)
     train_loader = DataLoader(
         train_dataset,
@@ -415,13 +428,17 @@ def train():
     )
 
     n_sub_epochs = 1000 // 1000  # number of times for reloading
-    log_loss = {"total_loss": 0, "query_loss": 0, "align_loss": 0}
+    log_loss: dict[str, int] = {"total_loss": 0, "query_loss": 0, "align_loss": 0}
 
     i_iter = 0
     print("Start training...")
     for sub_epoch in range(n_sub_epochs):
         print(f'This is epoch "{sub_epoch}" of "{n_sub_epochs}" epochs.')
         for _, sample in enumerate(train_loader):
+            pred_mask = []
+            tmp_sprior = []
+            sp_mask = []
+
             # Prepare episode data.
             print(sample)
             support_images = [
@@ -431,22 +448,59 @@ def train():
                 [shot.float() for shot in way] for way in sample["support_fg_labels"]
             ]
 
+            s_input = torch.cat(support_images[0], 1)
+            s_mask = torch.cat(support_fg_mask[0], 1)
+
+            support = torch.cat([s_input, s_mask], 2)
+            support = support.permute(1, 0, 2, 3, 4)
+
             query_images = [
                 query_image.float() for query_image in sample["query_images"]
             ]
+
+            query_images = torch.cat(query_images, dim=1)
             query_labels = torch.cat(
-                [query_label.long() for query_label in sample["query_labels"]], dim=0
+                [query_label.long() for query_label in sample["query_labels"]], dim=1
             )
 
             # Compute outputs and losses.
-            query_pred, align_loss = model(
+            out, sp_pred, max_corr2 = model(
                 query_images, support_images, support_fg_mask
+            )
+
+            tmp_sprior.append(out.detach().cpu().numpy())
+            out = F.interpolate(
+                out, size=img_query.shape[1:], mode="bilinear", align_corners=True
+            )
+            sp_pred = F.interpolate(
+                sp_pred,
+                size=img_query.shape[1:],
+                mode="bilinear",
+                align_corners=True,
+            )
+
+            output = (out > 0.5).squeeze(1)
+            sp_pred = (sp_pred > 0.5).squeeze(1)
+
+            pred_mask.append(output.cpu().numpy())
+            sp_mask.append(sp_pred.squeeze(1).cpu().numpy())
+
+            pred = np.concatenate(pred_mask, 0)
+            sp = np.concatenate(sp_mask, 0)
+
+            nrrd.write(
+                f"{save_path}/{i_iter}_pred.nrrd",
+                pred.transpose(2, 1, 0).astype(np.uint8),
+            )
+            nrrd.write(
+                f"{save_path}/{i_iter}_sp.nrrd",
+                sp.transpose(2, 1, 0).astype(np.uint8),
             )
 
             query_loss = criterion(
                 torch.log(
                     torch.clamp(
-                        query_pred,
+                        output.cpu().numpy(),
                         torch.finfo(torch.float32).eps,
                         1 - torch.finfo(torch.float32).eps,
                     )
@@ -459,6 +513,20 @@ def train():
             for param in model.parameters():
                 param.grad = None
 
+            # calculate total loss
+            # weights = [0.5, 0.5]
+            # loss = 0
+            # loss_list = []
+            # for n, loss_function in enumerate(losses):
+            #     curr_loss = loss_function(y_true[n], y_pred[n]) * weights[n]
+            #     loss_list.append(curr_loss.item())
+            #     loss += curr_loss
+
+            # backpropagate and optimize
+            # optimizer.zero_grad()
+            # loss.backward()
+            # optimizer.step()
+
             loss.backward()
             optimizer.step()
             scheduler.step()
@@ -466,10 +534,6 @@ def train():
             # Log loss
             query_loss = query_loss.detach().data.cpu().numpy()
             align_loss = align_loss.detach().data.cpu().numpy()
-
-            # _run.log_scalar('total_loss', loss.item())
-            # _run.log_scalar('query_loss', query_loss)
-            # _run.log_scalar('align_loss', align_loss)
 
             log_loss["total_loss"] += loss.item()
             log_loss["query_loss"] += query_loss

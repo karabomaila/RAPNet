@@ -16,7 +16,7 @@ class SDnetSegmentor(nn.Module):
     Segmentor Code
     """
 
-    def __init__(self, params):
+    def __init__(self, params) -> None:
         super(SDnetSegmentor, self).__init__()
         params["num_channels"] = 3
         params["num_filters"] = 16
@@ -90,32 +90,34 @@ class SDnetSegmentor(nn.Module):
 
         return bn, ind4, ind3, ind2, ind1, e4, e3, e2, e1
 
-    def _init_weights(self):
+    def _init_weights(self) -> None:
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 torch.nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
 
-    def forward(self, inpt, inpt_sp=None, inpt_mask=None):
-        bn, ind4, ind3, ind2, ind1, e4, e3, e2, e1 = self.seg_branch_encoder(inpt)
+    def forward(self, query_image, inpt_sp=None, inpt_mask=None):
+        bn, ind4, ind3, ind2, ind1, e4, e3, e2, e1 = self.seg_branch_encoder(
+            query_image
+        )
 
-        if inpt_sp is not None and len(inpt_sp.shape) == 5:
-            tmp_sp_poriors = []
-            tmp_sp_img_poriors = []
+        if inpt_sp and inpt_mask and len(inpt_sp.shape) == 5:
+            tmp_sp_priors = []
+            tmp_sp_img_priors = []
             for i in range(inpt_sp.shape[0]):
-                flow = self.unet(inpt_sp[i][:, :3], inpt)
+                flow = self.unet(inpt_sp[i][:, :3], query_image)
 
-                tmp_sp_porior = self.stn(inpt_mask[i][:, 1:2, ...], flow)
-                tmp_sp_img_porior = self.stn(inpt_sp[i][:, 1:2, ...], flow)
+                tmp_sp_prior = self.stn(inpt_mask[i][:, 1:2, ...], flow)
+                tmp_sp_img_prior = self.stn(inpt_sp[i][:, 1:2, ...], flow)
 
-                tmp_sp_poriors.append(tmp_sp_porior)
-                tmp_sp_img_poriors.append(tmp_sp_img_porior)
+                tmp_sp_priors.append(tmp_sp_prior)
+                tmp_sp_img_priors.append(tmp_sp_img_prior)
 
-        sp_prior = torch.cat(tmp_sp_poriors, 1).mean(1, keepdim=True)
-        sp_img_prior = torch.cat(tmp_sp_img_poriors, 1).mean(1, keepdim=True)
+        sp_prior = torch.cat(tmp_sp_priors, 1).mean(1, keepdim=True)
+        sp_img_prior = torch.cat(tmp_sp_img_priors, 1).mean(1, keepdim=True)
 
         # sp_prior = inpt_mask[:, :, 1:2, :, :].permute(1, 0, 2, 3, 4).mean(1)
 
-        if inpt_sp is not None and len(inpt_sp.shape) == 5:
+        if inpt_sp and inpt_mask and len(inpt_sp.shape) == 5:
             # k shot atten
             sp_feats_fg_e4 = []
             sp_feats_bg_e4 = []
@@ -361,27 +363,28 @@ class SDnetSegmentor(nn.Module):
 
         logit = self.mask_conv(torch.cat([bn_sa, d4_sa, d3_sa], 1))
 
-        logit = F.interpolate(logit, size=(inpt.shape[-2:]), mode="nearest")
+        logit = F.interpolate(logit, size=(query_image.shape[-2:]), mode="nearest")
 
         max_corr = F.interpolate(
-            max_corr_e3.float(), size=(inpt.shape[-2:]), mode="nearest"
+            max_corr_e3.float(), size=(query_image.shape[-2:]), mode="nearest"
         ).requires_grad_()
 
         return logit, sp_prior, max_corr, sp_img_prior
 
 
 class RAP(nn.Module):
-    def __init__(self, params):
+    def __init__(self, params) -> None:
         super(RAP, self).__init__()
         self.segmentor = SDnetSegmentor(params)
 
-    def forward(self, input1, input_sp, input_mask):
+    def forward(self, query_image, support_image, support_mask):
         """
-        :param input1:
-        :param input2:
+        :param query_image:
+        :param support_image:
+        :param support_mask:
         :return:
         """
-        segment = self.segmentor(input1, input_sp, input_mask)
+        segment = self.segmentor(query_image, support_image, support_mask)
         return segment
 
     @property
@@ -391,7 +394,7 @@ class RAP(nn.Module):
         """
         return next(self.parameters()).is_cuda
 
-    def save(self, path):
+    def save(self, path) -> None:
         """
         Save modules with its parameters to the given path. Conventionally the
         path should end with "*.modules".
@@ -403,6 +406,7 @@ class RAP(nn.Module):
         torch.save(self, path)
 
 
+"""
 if __name__ == "__main__":
     import argparse
 
@@ -453,3 +457,4 @@ if __name__ == "__main__":
             (shot, batch_size, 3, 256, 256),
         ],
     )
+"""
