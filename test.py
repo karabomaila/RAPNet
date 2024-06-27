@@ -63,7 +63,7 @@ def ts_main(ckpt_path) -> None:
     with torch.no_grad():
         for pid in all_query_img_path:
             print("qid:", pid)
-            query_name = pid.split("\\")[-1].split(".")[0]
+            query_name: str = pid.split("\\")[-1].split(".")[0]
 
             # read in the query image and its mask
             img_query = nrrd.read(pid)[0].transpose(2, 1, 0)
@@ -84,6 +84,7 @@ def ts_main(ckpt_path) -> None:
                     dsize=(IMAGE_SIZE, IMAGE_SIZE),
                     interpolation=cv2.INTER_LINEAR,
                 )
+
                 input = MR_normalize(input)
                 # 3 or 1 channel input
                 # input = torch.from_numpy(np.repeat(input[np.newaxis, np.newaxis, ...], 3, 1)).float().cuda()
@@ -246,6 +247,7 @@ def ts_main(ckpt_path) -> None:
                 out = F.interpolate(
                     out, size=img_query.shape[1:], mode="bilinear", align_corners=True
                 )
+
                 sp_pred = F.interpolate(
                     sp_pred,
                     size=img_query.shape[1:],

@@ -326,11 +326,6 @@ def ts_main(ckpt_path):
             )
 
 
-# print("running?")
-# ckpt_path = "/home/karabo/code/Few-shot/data/rap.pth"
-# ts = ts_main(ckpt_path)
-
-
 def train():
     # if _run.observers:
     # Set up source folder
@@ -470,11 +465,12 @@ def train():
 
             tmp_sprior.append(out.detach().cpu().numpy())
             out = F.interpolate(
-                out, size=img_query.shape[1:], mode="bilinear", align_corners=True
+                out, size=query_images.shape[1:], mode="bilinear", align_corners=True
             )
+
             sp_pred = F.interpolate(
                 sp_pred,
-                size=img_query.shape[1:],
+                size=query_images.shape[1:],
                 mode="bilinear",
                 align_corners=True,
             )
@@ -485,17 +481,8 @@ def train():
             pred_mask.append(output.cpu().numpy())
             sp_mask.append(sp_pred.squeeze(1).cpu().numpy())
 
-            pred = np.concatenate(pred_mask, 0)
-            sp = np.concatenate(sp_mask, 0)
-
-            nrrd.write(
-                f"{save_path}/{i_iter}_pred.nrrd",
-                pred.transpose(2, 1, 0).astype(np.uint8),
-            )
-            nrrd.write(
-                f"{save_path}/{i_iter}_sp.nrrd",
-                sp.transpose(2, 1, 0).astype(np.uint8),
-            )
+            # pred = np.concatenate(pred_mask, 0)
+            # sp = np.concatenate(sp_mask, 0)
 
             query_loss = criterion(
                 torch.log(
@@ -507,7 +494,18 @@ def train():
                 ),
                 query_labels,
             )
-            loss = query_loss + align_loss
+            support_loss = criterion(
+                torch.log(
+                    torch.clamp(
+                        sp_pred.cpu().numpy(),
+                        torch.finfo(torch.float32).eps,
+                        1 - torch.finfo(torch.float32).eps,
+                    )
+                ),
+                support,
+            )
+
+            loss = query_loss + support_loss
 
             # Compute gradient and do SGD step.
             for param in model.parameters():
@@ -533,25 +531,25 @@ def train():
 
             # Log loss
             query_loss = query_loss.detach().data.cpu().numpy()
-            align_loss = align_loss.detach().data.cpu().numpy()
+            # align_loss = align_loss.detach().data.cpu().numpy()
 
             log_loss["total_loss"] += loss.item()
             log_loss["query_loss"] += query_loss
-            log_loss["align_loss"] += align_loss
+            # log_loss["align_loss"] += align_loss
 
             # Print loss and take snapshots.
             if (i_iter + 1) % 100 == 0:
                 total_loss = log_loss["total_loss"] / 100
                 query_loss = log_loss["query_loss"] / 100
-                align_loss = log_loss["align_loss"] / 100
+                # align_loss = log_loss["align_loss"] / 100
 
                 log_loss["total_loss"] = 0
                 log_loss["query_loss"] = 0
-                log_loss["align_loss"] = 0
+                # log_loss["align_loss"] = 0
 
                 print(
                     f"step {i_iter + 1}: total_loss: {total_loss}, query_loss: {query_loss},"
-                    f" align_loss: {align_loss}"
+                    f" align_loss: 0"
                 )
 
             if (i_iter + 1) % 1000 == 0:
