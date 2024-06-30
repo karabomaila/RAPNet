@@ -455,11 +455,12 @@ def train():
             ]
             print(len(support_fg_mask), len(support_fg_mask[0]))
 
-            s_input: torch.Tensor = torch.cat(support_images[0], 2)
-            s_mask: torch.Tensor = torch.cat(support_fg_mask[0][0], 2)
+            s_input: torch.Tensor = torch.cat(support_images[0], 1)
+            s_mask: torch.Tensor = torch.cat(support_fg_mask[0], 1)
             print(f"s_input shape: {s_input.shape}", f"s_mask shape: {s_mask.shape}")
 
             support: torch.Tensor = torch.cat([s_input, s_mask], 2)
+            print(support.shape)
             support = support.permute(1, 0, 2, 3, 4)
 
             query_images = [
@@ -473,7 +474,7 @@ def train():
 
             # Compute outputs and losses.
             out, sp_pred, max_corr2 = model(
-                query_images, support_images, support_fg_mask
+                query_image=query_images, support_image=support_images, support_mask=support_fg_mask
             )
 
             tmp_sprior.append(out.detach().cpu().numpy())

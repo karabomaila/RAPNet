@@ -353,6 +353,7 @@ class TrainDataset(Dataset):
 
         # n_way * (n_shot * C) * H * W
         sup_lbl = lbl_cls[sample[: self.n_shot * self.n_way]][None,]
+        
         print(sup_lbl.shape)
 
         # n_qry * C * H * W
@@ -385,7 +386,10 @@ class TrainDataset(Dataset):
                 sup_lbl,
             ) = self.geom_transform(sup_img, sup_lbl)
             print(sup_img.shape, sup_lbl.shape)
-
+        sup_lbl = np.stack((sup_lbl, sup_lbl, sup_lbl), axis=2)
+        
+        sup_lbl = sup_lbl[np.newaxis, ...]
+        sup_img = sup_img[np.newaxis, ...]
         sample = {
             "support_images": sup_img,
             "support_fg_labels": sup_lbl,

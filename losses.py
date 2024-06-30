@@ -127,7 +127,7 @@ class Grad:
 
         return df
 
-    def loss(self, _, y_pred) -> torch.Tensor | Any:
+    def loss(self, _, y_pred) -> Any:
         if self.penalty == "l1":
             dif: list[torch.Tensor] = [torch.abs(f) for f in self._diffs(y_pred)]
         else:

@@ -8,8 +8,8 @@ class U_Network(nn.Module):
     def __init__(
         self,
         dim: int,
-        enc_nf: list[int],
-        dec_nf: list[int],
+        enc_nf: list,
+        dec_nf: list,
         bn: bool = False,
         full_size: bool = True,
     ) -> None:
