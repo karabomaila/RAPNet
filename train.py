@@ -398,6 +398,9 @@ def train():
     my_weight = torch.FloatTensor([0.1, 1.0])
     criterion = nn.NLLLoss(ignore_index=255, weight=my_weight)
 
+    spatial_branch = fs.U_Network(2, [16, 32, 32, 32], [32, 32, 32, 32, 8, 8])
+    spatial_transformer = fs.SpatialTransformer((256, 256))
+
     mse = losses.MSE()
     dice = losses.Dice()
 
@@ -446,18 +449,18 @@ def train():
             support_images = [
                 [shot.float() for shot in way] for way in sample["support_images"]
             ]
-            print(
-                len(support_images), len(support_images[0]), support_images[0][0].shape
-            )
+            # print(
+            #     len(support_images), len(support_images[0]), support_images[0][0].shape
+            # )
 
             support_fg_mask = [
                 [shot.float() for shot in way] for way in sample["support_fg_labels"]
             ]
-            print(len(support_fg_mask), len(support_fg_mask[0]))
+            # print(len(support_fg_mask), len(support_fg_mask[0]))
 
             s_input: torch.Tensor = torch.cat(support_images[0], 1)
             s_mask: torch.Tensor = torch.cat(support_fg_mask[0], 1)
-            print(f"s_input shape: {s_input.shape}", f"s_mask shape: {s_mask.shape}")
+            # print(f"s_input shape: {s_input.shape}", f"s_mask shape: {s_mask.shape}")
 
             support: torch.Tensor = torch.cat([s_input, s_mask], 2)
             print(support.shape)
@@ -466,15 +469,18 @@ def train():
             query_images = [
                 query_image.float() for query_image in sample["query_images"]
             ]
-
             query_images = torch.cat(query_images, dim=1)
-            query_labels = torch.cat(
+
+            query_labels: torch.Tensor = torch.cat(
                 [query_label.long() for query_label in sample["query_labels"]], dim=1
             )
 
             # Compute outputs and losses.
-            out, sp_pred, max_corr2 = model(
-                query_image=query_images, support_image=support_images, support_mask=support_fg_mask
+            # print(query_image.shape, support_image.shape, support_mask.shape)
+            out, sp_pred, max_corr2, sp_img_prior = model(
+                query_images,
+                support,
+                s_mask.permute(1, 0, 2, 3, 4),
             )
 
             tmp_sprior.append(out.detach().cpu().numpy())
@@ -498,10 +504,7 @@ def train():
             # pred = np.concatenate(pred_mask, 0)
             # sp = np.concatenate(sp_mask, 0)
 
-            spatial_branch = fs.U_Network(2, [16, 32, 32, 32], [32, 32, 32, 32, 8, 8])
             flow = spatial_branch.forward(support_images, query_images)
-            spatial_transformer = fs.SpatialTransformer((256, 256))
-
             spatial_prior_support: torch.Tensor = spatial_transformer.forward(
                 support_images, flow
             )

@@ -109,7 +109,7 @@ class SDnetSegmentor(nn.Module):
             query_image
         )
 
-        if not inpt_sp or not inpt_mask:
+        if inpt_sp is None or inpt_mask is None:
             raise ValueError("All the inputs are required")
 
         if len(inpt_sp.shape) == 5:
@@ -401,7 +401,7 @@ class RAP(nn.Module):
         :param query_image:
         :param support_image:
         :param support_mask:
-        :return:
+        :return mask prediction
         """
         segment = self.segmentor(query_image, support_image, support_mask)
         return segment
