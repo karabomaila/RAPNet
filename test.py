@@ -123,7 +123,9 @@ def ts_main(ckpt_path) -> None:
 
                     # finish reading query img(1 or 3 slices) and mask (1 slice)
                     # combine the slices
-                    query = torch.cat([query_pre, query, query_next], dim=1).cuda()
+                    query: torch.Tensor = torch.cat(
+                        [query_pre, query, query_next], dim=1
+                    ).cuda()
 
                     mask_query = cv2.resize(
                         mask_query[query_slice],
@@ -220,8 +222,12 @@ def ts_main(ckpt_path) -> None:
                             sp_masks_tmp.append(s_mask)
 
                         # add or combine all the slices
-                        s_input = torch.cat(sp_imgs_tmp, 2)  # [1,1,slice,H,W]
-                        s_mask = torch.cat(sp_masks_tmp, 2)  # [1,1,slice,H,W]
+                        s_input: torch.Tensor = torch.cat(
+                            sp_imgs_tmp, 2
+                        )  # [1,1,slice,H,W]
+                        s_mask: torch.Tensor = torch.cat(
+                            sp_masks_tmp, 2
+                        )  # [1,1,slice,H,W]
 
                     s_inputs.append(s_input)
                     s_masks.append(s_mask)

@@ -442,18 +442,24 @@ def train():
             sp_mask = []
 
             # Prepare episode data.
-            print(sample)
+            # print(sample)
             support_images = [
                 [shot.float() for shot in way] for way in sample["support_images"]
             ]
+            print(
+                len(support_images), len(support_images[0]), support_images[0][0].shape
+            )
+
             support_fg_mask = [
                 [shot.float() for shot in way] for way in sample["support_fg_labels"]
             ]
+            print(len(support_fg_mask), len(support_fg_mask[0]))
 
-            s_input = torch.cat(support_images[0], 1)
-            s_mask = torch.cat(support_fg_mask[0], 1)
+            s_input: torch.Tensor = torch.cat(support_images[0], 2)
+            s_mask: torch.Tensor = torch.cat(support_fg_mask[0], 2)
+            print(f"s_input shape: {s_input.shape}", f"s_mask shape: {s_mask.shape}")
 
-            support = torch.cat([s_input, s_mask], 2)
+            support: torch.Tensor = torch.cat([s_input, s_mask], 2)
             support = support.permute(1, 0, 2, 3, 4)
 
             query_images = [
