@@ -10,8 +10,8 @@ class U_Network(nn.Module):
         dim: int,
         enc_nf: list[int],
         dec_nf: list[int],
-        bn: bool | None = None,
-        full_size=True,
+        bn: bool = False,
+        full_size: bool = True,
     ) -> None:
         super(U_Network, self).__init__()
         self.bn: bool | None = bn
@@ -108,20 +108,24 @@ class U_Network(nn.Module):
         for i, l in enumerate(self.enc):
             x = l(x_enc[-1])
             x_enc.append(x)
+
         # Three conv + upsample + concatenate series
         y = x_enc[-1]
         for i in range(3):
             y = self.dec[i](y)
             y = self.upsample(y)
             y = torch.cat([y, x_enc[-(i + 2)]], dim=1)
+
         # Two convs at full_size/2 res
         y = self.dec[3](y)
         y = self.dec[4](y)
+
         # Upsample to full res, concatenate and conv
         if self.full_size:
             y = self.upsample(y)
             y = torch.cat([y, x_enc[0]], dim=1)
             y = self.dec[5](y)
+
         # Extra conv for vm2
         if self.vm2:
             y = self.vm2_conv(y)
@@ -142,7 +146,7 @@ class SpatialTransformer(nn.Module):
         grid = grid.type(torch.FloatTensor)
         self.register_buffer("grid", grid)
 
-        self.mode = mode
+        self.mode: str = mode
 
     def forward(self, src, flow):
         new_locs = self.grid + flow
@@ -168,7 +172,7 @@ if __name__ == "__main__":
     trg = torch.ones((1, 3, 256, 256))
     mask = torch.ones((1, 1, 256, 256))
     flow = unet(src, trg)
-    print(flow.shape)
+    print("flow: ", flow.shape)
 
     stn = SpatialTransformer((256, 256))
     print(stn(mask, flow).shape)
