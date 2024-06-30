@@ -78,6 +78,7 @@ def ts_main(ckpt_path) -> None:
             pred_mask = []
             tmp_sprior = []
             sp_mask = []
+
             for query_slice in range(img_query.shape[0]):
                 input = cv2.resize(
                     img_query[query_slice],
@@ -85,6 +86,7 @@ def ts_main(ckpt_path) -> None:
                     interpolation=cv2.INTER_LINEAR,
                 )
 
+                # preprocess the query slice
                 input = MR_normalize(input)
                 # 3 or 1 channel input
                 # input = torch.from_numpy(np.repeat(input[np.newaxis, np.newaxis, ...], 3, 1)).float().cuda()
@@ -120,7 +122,9 @@ def ts_main(ckpt_path) -> None:
                         ).float()
 
                     # finish reading query img(1 or 3 slices) and mask (1 slice)
+                    # combine the slices
                     query = torch.cat([query_pre, query, query_next], dim=1).cuda()
+
                     mask_query = cv2.resize(
                         mask_query[query_slice],
                         dsize=(IMAGE_SIZE, IMAGE_SIZE),
@@ -131,7 +135,7 @@ def ts_main(ckpt_path) -> None:
                 support_paths: list[str] = random.sample(tmp_support_path, SHOTS)
                 print("sids:", support_paths)
 
-                # read in the sampled support images
+                # read in the sampled K-shot support images
                 sp_imgs = []
                 sp_masks = []
                 for i in range(SHOTS):
@@ -145,7 +149,7 @@ def ts_main(ckpt_path) -> None:
                     sp_imgs.append(img_support)
                     sp_masks.append(mask_support)
 
-                # get cur_slice support
+                # get the current slice support images
                 s_inputs = []
                 s_masks = []
                 for i in range(SHOTS):
@@ -178,21 +182,12 @@ def ts_main(ckpt_path) -> None:
                             msk_support[np.newaxis, np.newaxis, np.newaxis, ...]
                         ).float()
                     else:
-                        # S2
-                        # bias = sp_shp0 / 3 / 2
-                        # ratio = query_slice / img_query.shape[0]
-                        # if ratio < 1 / 3:
-                        #     sp_index = int(bias)
-                        # elif ratio >= 1 / 3 and ratio < 2 / 3:
-                        #     sp_index = int(1 / 3 * sp_shp0 + bias)
-                        # else:
-                        #     sp_index = int(2 / 3 * sp_shp0 + bias)
-
                         sp_indexes: list[int] = [
                             max(sp_index - 1, 0),
                             sp_index,
                             min(sp_index + 1, sp_shp0 - 1),
                         ]
+
                         # reading the previous, current and the next support slices
                         sp_imgs_tmp = []
                         sp_masks_tmp = []
@@ -208,7 +203,6 @@ def ts_main(ckpt_path) -> None:
                                 img_support_r[np.newaxis, np.newaxis, np.newaxis, ...]
                             ).float()
 
-                            sp_imgs_tmp.append(s_input)
                             msk_support = (
                                 cv2.resize(
                                     mask_support[sp_index],
@@ -221,6 +215,8 @@ def ts_main(ckpt_path) -> None:
                             s_mask = torch.from_numpy(
                                 msk_support[np.newaxis, np.newaxis, np.newaxis, ...]
                             ).float()
+
+                            sp_imgs_tmp.append(s_input)
                             sp_masks_tmp.append(s_mask)
 
                         # add or combine all the slices

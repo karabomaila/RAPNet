@@ -5,55 +5,100 @@ from torch.distributions.normal import Normal
 
 
 class U_Network(nn.Module):
-    def __init__(self, dim, enc_nf, dec_nf, bn=None, full_size=True):
+    def __init__(
+        self,
+        dim: int,
+        enc_nf: list[int],
+        dec_nf: list[int],
+        bn: bool | None = None,
+        full_size=True,
+    ) -> None:
         super(U_Network, self).__init__()
-        self.bn = bn
-        self.dim = dim
-        self.enc_nf = enc_nf
-        self.full_size = full_size
-        self.vm2 = len(dec_nf) == 7
+        self.bn: bool | None = bn
+        self.dim: int = dim
+        self.enc_nf: list[int] = enc_nf
+        self.full_size: bool = full_size
+        self.vm2: bool = len(dec_nf) == 7
+
         # Encoder functions
         self.enc = nn.ModuleList()
         for i in range(len(enc_nf)):
-           # prev_nf = 2 if i == 0 else enc_nf[i - 1]
+            # prev_nf = 2 if i == 0 else enc_nf[i - 1]
             prev_nf = 6 if i == 0 else enc_nf[i - 1]
-            self.enc.append(self.conv_block(dim, prev_nf, enc_nf[i], 4, 2, batchnorm=bn))
+            self.enc.append(
+                self.conv_block(dim, prev_nf, enc_nf[i], 4, 2, batchnorm=bn)
+            )
+
         # Decoder functions
         self.dec = nn.ModuleList()
         self.dec.append(self.conv_block(dim, enc_nf[-1], dec_nf[0], batchnorm=bn))  # 1
-        self.dec.append(self.conv_block(dim, dec_nf[0] * 2, dec_nf[1], batchnorm=bn))  # 2
-        self.dec.append(self.conv_block(dim, dec_nf[1] * 2, dec_nf[2], batchnorm=bn))  # 3
-        self.dec.append(self.conv_block(dim, dec_nf[2] + enc_nf[0], dec_nf[3], batchnorm=bn))  # 4
+        self.dec.append(
+            self.conv_block(dim, dec_nf[0] * 2, dec_nf[1], batchnorm=bn)
+        )  # 2
+        self.dec.append(
+            self.conv_block(dim, dec_nf[1] * 2, dec_nf[2], batchnorm=bn)
+        )  # 3
+        self.dec.append(
+            self.conv_block(dim, dec_nf[2] + enc_nf[0], dec_nf[3], batchnorm=bn)
+        )  # 4
         self.dec.append(self.conv_block(dim, dec_nf[3], dec_nf[4], batchnorm=bn))  # 5
 
         if self.full_size:
-            self.dec.append(self.conv_block(dim, dec_nf[4] + 6, dec_nf[5], batchnorm=bn))
+            self.dec.append(
+                self.conv_block(dim, dec_nf[4] + 6, dec_nf[5], batchnorm=bn)
+            )
             # self.dec.append(self.conv_block(dim, dec_nf[4] + 2, dec_nf[5], batchnorm=bn))
+
         if self.vm2:
             self.vm2_conv = self.conv_block(dim, dec_nf[5], dec_nf[6], batchnorm=bn)
-        self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
+
+        self.upsample = nn.Upsample(scale_factor=2, mode="nearest")
 
         # One conv to get the flow field
-        conv_fn = getattr(nn, 'Conv%dd' % dim)
+        conv_fn = getattr(nn, "Conv%dd" % dim)
         self.flow = conv_fn(dec_nf[-1], dim, kernel_size=3, padding=1)
+
         # Make flow weights + bias small. Not sure this is necessary.
         nd = Normal(0, 1e-5)
         self.flow.weight = nn.Parameter(nd.sample(self.flow.weight.shape))
         self.flow.bias = nn.Parameter(torch.zeros(self.flow.bias.shape))
         self.batch_norm = getattr(nn, "BatchNorm{0}d".format(dim))(3)
 
-    def conv_block(self, dim, in_channels, out_channels, kernel_size=3, stride=1, padding=1, batchnorm=False):
+    def conv_block(
+        self,
+        dim,
+        in_channels,
+        out_channels,
+        kernel_size=3,
+        stride=1,
+        padding=1,
+        batchnorm=False,
+    ):
         conv_fn = getattr(nn, "Conv{0}d".format(dim))
         bn_fn = getattr(nn, "BatchNorm{0}d".format(dim))
         if batchnorm:
             layer = nn.Sequential(
-                conv_fn(in_channels, out_channels, kernel_size, stride=stride, padding=padding),
+                conv_fn(
+                    in_channels,
+                    out_channels,
+                    kernel_size,
+                    stride=stride,
+                    padding=padding,
+                ),
                 bn_fn(out_channels),
-                nn.LeakyReLU(0.2))
+                nn.LeakyReLU(0.2),
+            )
         else:
             layer = nn.Sequential(
-                conv_fn(in_channels, out_channels, kernel_size, stride=stride, padding=padding),
-                nn.LeakyReLU(0.2))
+                conv_fn(
+                    in_channels,
+                    out_channels,
+                    kernel_size,
+                    stride=stride,
+                    padding=padding,
+                ),
+                nn.LeakyReLU(0.2),
+            )
         return layer
 
     def forward(self, src, tgt):
@@ -87,7 +132,7 @@ class U_Network(nn.Module):
 
 
 class SpatialTransformer(nn.Module):
-    def __init__(self, size, mode='bilinear'):
+    def __init__(self, size, mode="bilinear") -> None:
         super(SpatialTransformer, self).__init__()
         # Create sampling grid
         vectors = [torch.arange(0, s) for s in size]
@@ -95,7 +140,7 @@ class SpatialTransformer(nn.Module):
         grid = torch.stack(grids)  # y, x, z
         grid = torch.unsqueeze(grid, 0)  # add batch
         grid = grid.type(torch.FloatTensor)
-        self.register_buffer('grid', grid)
+        self.register_buffer("grid", grid)
 
         self.mode = mode
 
@@ -116,9 +161,10 @@ class SpatialTransformer(nn.Module):
 
         return F.grid_sample(src, new_locs, mode=self.mode)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unet = U_Network(2, [16, 32, 32, 32], [32, 32, 32, 32, 8, 8])
-    src = torch.ones((1, 3, 256,256))
+    src = torch.ones((1, 3, 256, 256))
     trg = torch.ones((1, 3, 256, 256))
     mask = torch.ones((1, 1, 256, 256))
     flow = unet(src, trg)
@@ -126,4 +172,3 @@ if __name__ == '__main__':
 
     stn = SpatialTransformer((256, 256))
     print(stn(mask, flow).shape)
-

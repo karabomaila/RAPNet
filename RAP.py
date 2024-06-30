@@ -21,15 +21,19 @@ class SDnetSegmentor(nn.Module):
         params["num_channels"] = 3
         params["num_filters"] = 16
         self.encode1 = cm.SDnetEncoderBlock(params)
+
         params["num_channels"] = 16
         params["num_filters"] = 32
         self.encode2 = cm.SDnetEncoderBlock(params)
+
         params["num_channels"] = 32
         params["num_filters"] = 64
         self.encode3 = cm.SDnetEncoderBlock(params)
+
         params["num_channels"] = 64
         params["num_filters"] = 64
         self.encode4 = cm.SDnetEncoderBlock(params)
+
         params["num_channels"] = 64
         params["num_filters"] = 64
         self.bottleneck = cm.GenericBlock(params)
@@ -37,15 +41,18 @@ class SDnetSegmentor(nn.Module):
         params["num_channels"] = 128
         params["num_filters"] = 32
         self.decode3 = cm.SDnetDecoderBlock(params)
+
         params["num_channels"] = 128
         params["num_filters"] = 64
         self.decode4 = cm.SDnetDecoderBlock(params)
+
         params["num_channels"] = 64
         params["num_class"] = 1
         self.classifier = cm.ClassifierBlock(params)
-        params["num_channels"] = 1
 
+        params["num_channels"] = 1
         cood_conv = cm.CoordConv(16 * 3, 1, kernel_size=3, padding=1)  # 24
+
         self.soft_max = nn.Softmax2d()
         self.sigmoid = nn.Sigmoid()
         self.mask_conv = nn.Sequential(cood_conv, nn.Sigmoid())
@@ -64,11 +71,13 @@ class SDnetSegmentor(nn.Module):
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
         )
+
         self.q3 = nn.Sequential(
             nn.Conv2d(64 + (3 * 2 + 1) ** 2, 64, 1),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
         )
+
         self.q2 = nn.Sequential(
             nn.Conv2d(32 + (3 * 2 + 1) ** 2, 32, 1),
             nn.BatchNorm2d(32),
@@ -81,6 +90,11 @@ class SDnetSegmentor(nn.Module):
 
         self._init_weights()
 
+    def _init_weights(self) -> None:
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                torch.nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
+
     def seg_branch_encoder(self, input):
         e1, _, ind1 = self.encode1(input)
         e2, _, ind2 = self.encode2(e1)
@@ -90,17 +104,15 @@ class SDnetSegmentor(nn.Module):
 
         return bn, ind4, ind3, ind2, ind1, e4, e3, e2, e1
 
-    def _init_weights(self) -> None:
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                torch.nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
-
-    def forward(self, query_image, inpt_sp=None, inpt_mask=None):
+    def forward(self, query_image, inpt_sp, inpt_mask):
         bn, ind4, ind3, ind2, ind1, e4, e3, e2, e1 = self.seg_branch_encoder(
             query_image
         )
 
-        if inpt_sp and inpt_mask and len(inpt_sp.shape) == 5:
+        if not inpt_sp or not inpt_mask:
+            raise ValueError("All the inputs are required")
+
+        if len(inpt_sp.shape) == 5:
             tmp_sp_priors = []
             tmp_sp_img_priors = []
             for i in range(inpt_sp.shape[0]):
@@ -117,14 +129,18 @@ class SDnetSegmentor(nn.Module):
 
         # sp_prior = inpt_mask[:, :, 1:2, :, :].permute(1, 0, 2, 3, 4).mean(1)
 
-        if inpt_sp and inpt_mask and len(inpt_sp.shape) == 5:
+        if len(inpt_sp.shape) == 5:
             # k shot atten
             sp_feats_fg_e4 = []
             sp_feats_bg_e4 = []
+
             sp_feats_fg_e3 = []
             sp_feats_bg_e3 = []
             sp_feats_fg_e2 = []
             sp_feats_bg_e2 = []
+
+            sp_feats_fg_e1 = []
+            sp_feats_bg_e1 = []
 
             for i in range(inpt_sp.shape[0]):
                 bn, ind4, ind3, ind2, ind1, e4_sp, e3_sp, e2_sp, e1_sp = (
@@ -154,6 +170,7 @@ class SDnetSegmentor(nn.Module):
                 fore_avg_feat = torch.sum(
                     torch.sum(corr_fg * sp_mask, dim=3), dim=2
                 ) / (torch.sum(sp_mask) + torch.tensor(1e-10).to(sp_mask.device))
+
                 bg_avg_feat = torch.sum(
                     torch.sum(corr_bg * (1 - sp_mask), dim=3), dim=2
                 ) / torch.sum(1 - sp_mask)
@@ -185,6 +202,7 @@ class SDnetSegmentor(nn.Module):
                 fore_avg_feat = torch.sum(
                     torch.sum(corr_fg * sp_mask, dim=3), dim=2
                 ) / (torch.sum(sp_mask) + torch.tensor(1e-10).to(sp_mask.device))
+
                 bg_avg_feat = torch.sum(
                     torch.sum(corr_bg * (1 - sp_mask), dim=3), dim=2
                 ) / torch.sum(1 - sp_mask)
@@ -217,6 +235,7 @@ class SDnetSegmentor(nn.Module):
                 fore_avg_feat = torch.sum(
                     torch.sum(corr_fg * sp_mask, dim=3), dim=2
                 ) / (torch.sum(sp_mask) + torch.tensor(1e-10).to(sp_mask.device))
+
                 bg_avg_feat = torch.sum(
                     torch.sum(corr_bg * (1 - sp_mask), dim=3), dim=2
                 ) / torch.sum(1 - sp_mask)
