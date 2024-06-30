@@ -21,6 +21,7 @@ from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
 
 import load_dataset
+import losses
 import RAP as fs
 from settings import Settings
 
@@ -397,6 +398,12 @@ def train():
     my_weight = torch.FloatTensor([0.1, 1.0])
     criterion = nn.NLLLoss(ignore_index=255, weight=my_weight)
 
+    mse = losses.MSE()
+    dice = losses.Dice()
+
+    alpha = 0.05
+    beta = 0.01
+
     print("Load data...")
     data_config = {
         "n_shot": 1,
@@ -484,28 +491,47 @@ def train():
             # pred = np.concatenate(pred_mask, 0)
             # sp = np.concatenate(sp_mask, 0)
 
-            query_loss = criterion(
-                torch.log(
-                    torch.clamp(
-                        output.cpu().numpy(),
-                        torch.finfo(torch.float32).eps,
-                        1 - torch.finfo(torch.float32).eps,
-                    )
-                ),
-                query_labels,
+            spatial_branch = fs.U_Network(2, [16, 32, 32, 32], [32, 32, 32, 32, 8, 8])
+            flow = spatial_branch.forward(support_images, query_images)
+            spatial_transformer = fs.SpatialTransformer((256, 256))
+
+            spatial_prior_support: torch.Tensor = spatial_transformer.forward(
+                support_images, flow
             )
-            support_loss = criterion(
-                torch.log(
-                    torch.clamp(
-                        sp_pred.cpu().numpy(),
-                        torch.finfo(torch.float32).eps,
-                        1 - torch.finfo(torch.float32).eps,
-                    )
-                ),
-                support,
+            spatial_prior_mask: torch.Tensor = spatial_transformer.forward(
+                support_fg_mask, flow
             )
 
-            loss = query_loss + support_loss
+            loss_sp: torch.Tensor = mse.loss(
+                spatial_prior_support, query_labels
+            ) + alpha * dice.loss(spatial_prior_mask, query_labels)
+
+            loss_seg: torch.Tensor = dice.loss(pred_mask, query_labels)
+
+            loss: torch.Tensor = loss_sp + loss_seg
+
+            # query_loss = criterion(
+            #     torch.log(
+            #         torch.clamp(
+            #             output.cpu().numpy(),
+            #             torch.finfo(torch.float32).eps,
+            #             1 - torch.finfo(torch.float32).eps,
+            #         )
+            #     ),
+            #     query_labels,
+            # )
+            # support_loss = criterion(
+            #     torch.log(
+            #         torch.clamp(
+            #             sp_pred.cpu().numpy(),
+            #             torch.finfo(torch.float32).eps,
+            #             1 - torch.finfo(torch.float32).eps,
+            #         )
+            #     ),
+            #     support,
+            # )
+
+            # loss = query_loss + support_loss
 
             # Compute gradient and do SGD step.
             for param in model.parameters():
@@ -530,27 +556,24 @@ def train():
             scheduler.step()
 
             # Log loss
-            query_loss = query_loss.detach().data.cpu().numpy()
+            # query_loss = query_loss.detach().data.cpu().numpy()
             # align_loss = align_loss.detach().data.cpu().numpy()
 
             log_loss["total_loss"] += loss.item()
-            log_loss["query_loss"] += query_loss
+            # log_loss["query_loss"] += query_loss
             # log_loss["align_loss"] += align_loss
 
             # Print loss and take snapshots.
             if (i_iter + 1) % 100 == 0:
                 total_loss = log_loss["total_loss"] / 100
-                query_loss = log_loss["query_loss"] / 100
+                # query_loss = log_loss["query_loss"] / 100
                 # align_loss = log_loss["align_loss"] / 100
 
                 log_loss["total_loss"] = 0
-                log_loss["query_loss"] = 0
+                # log_loss["query_loss"] = 0
                 # log_loss["align_loss"] = 0
 
-                print(
-                    f"step {i_iter + 1}: total_loss: {total_loss}, query_loss: {query_loss},"
-                    f" align_loss: 0"
-                )
+                print(f"step {i_iter + 1}: total_loss: {total_loss}," f" align_loss: 0")
 
             if (i_iter + 1) % 1000 == 0:
                 print("###### Taking snapshot ######")
