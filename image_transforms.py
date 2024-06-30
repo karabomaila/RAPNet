@@ -3,65 +3,67 @@ Image Transformation
 Code originally from Ouyang et al. (used in the 2D setting)
 """
 
-from collections import Sequence
+from collections.abc import Sequence
+
 import cv2
 import numpy as np
-import scipy
+from numpy.lib.stride_tricks import as_strided
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.interpolation import map_coordinates
-from numpy.lib.stride_tricks import as_strided
 
 
 ###### UTILITIES ######
 def random_num_generator(config, random_state=np.random):
-    if config[0] == 'uniform':
+    if config[0] == "uniform":
         ret = random_state.uniform(config[1], config[2], 1)[0]
-    elif config[0] == 'lognormal':
+    elif config[0] == "lognormal":
         ret = random_state.lognormal(config[1], config[2], 1)[0]
     else:
         # print(config)
-        raise Exception('unsupported format')
+        raise Exception("unsupported format")
     return ret
 
 
 def get_translation_matrix(translation):
-    """ translation: [tx, ty] """
+    """translation: [tx, ty]"""
     tx, ty = translation
-    translation_matrix = np.array([[1, 0, tx],
-                                   [0, 1, ty],
-                                   [0, 0, 1]])
+    translation_matrix = np.array([[1, 0, tx], [0, 1, ty], [0, 0, 1]])
     return translation_matrix
 
 
 def get_rotation_matrix(rotation, input_shape, centred=True):
     theta = np.pi / 180 * np.array(rotation)
     if centred:
-        rotation_matrix = cv2.getRotationMatrix2D((input_shape[0] / 2, input_shape[1] // 2), rotation, 1)
+        rotation_matrix = cv2.getRotationMatrix2D(
+            (input_shape[0] / 2, input_shape[1] // 2), rotation, 1
+        )
         rotation_matrix = np.vstack([rotation_matrix, [0, 0, 1]])
     else:
-        rotation_matrix = np.array([[np.cos(theta), -np.sin(theta), 0],
-                                    [np.sin(theta), np.cos(theta), 0],
-                                    [0, 0, 1]])
+        rotation_matrix = np.array(
+            [
+                [np.cos(theta), -np.sin(theta), 0],
+                [np.sin(theta), np.cos(theta), 0],
+                [0, 0, 1],
+            ]
+        )
     return rotation_matrix
 
 
 def get_zoom_matrix(zoom, input_shape, centred=True):
     zx, zy = zoom
     if centred:
-        zoom_matrix = cv2.getRotationMatrix2D((input_shape[0] / 2, input_shape[1] // 2), 0, zoom[0])
+        zoom_matrix = cv2.getRotationMatrix2D(
+            (input_shape[0] / 2, input_shape[1] // 2), 0, zoom[0]
+        )
         zoom_matrix = np.vstack([zoom_matrix, [0, 0, 1]])
     else:
-        zoom_matrix = np.array([[zx, 0, 0],
-                                [0, zy, 0],
-                                [0, 0, 1]])
+        zoom_matrix = np.array([[zx, 0, 0], [0, zy, 0], [0, 0, 1]])
     return zoom_matrix
 
 
 def get_shear_matrix(shear_angle):
     theta = (np.pi * shear_angle) / 180
-    shear_matrix = np.array([[1, -np.sin(theta), 0],
-                             [0, np.cos(theta), 0],
-                             [0, 0, 1]])
+    shear_matrix = np.array([[1, -np.sin(theta), 0], [0, np.cos(theta), 0], [0, 0, 1]])
     return shear_matrix
 
 
@@ -79,14 +81,16 @@ class RandomAffine(object):
     order: interpolation method (c.f. opencv)
     """
 
-    def __init__(self,
-                 rotation_range=None,
-                 translation_range=None,
-                 shear_range=None,
-                 zoom_range=None,
-                 zoom_keep_aspect=False,
-                 interp='bilinear',
-                 order=3):
+    def __init__(
+        self,
+        rotation_range=None,
+        translation_range=None,
+        shear_range=None,
+        zoom_range=None,
+        zoom_keep_aspect=False,
+        interp="bilinear",
+        order=3,
+    ):
         """
         Perform an affine transforms.
 
@@ -127,8 +131,12 @@ class RandomAffine(object):
             rot = np.random.uniform(-self.rotation_range, self.rotation_range)
             tfx.append(get_rotation_matrix(rot, input_shape))
         if self.translation_range:
-            tx = np.random.uniform(-self.translation_range[0], self.translation_range[0])
-            ty = np.random.uniform(-self.translation_range[1], self.translation_range[1])
+            tx = np.random.uniform(
+                -self.translation_range[0], self.translation_range[0]
+            )
+            ty = np.random.uniform(
+                -self.translation_range[1], self.translation_range[1]
+            )
             tfx.append(get_translation_matrix((tx, ty)))
         if self.shear_range:
             rot = np.random.uniform(-self.shear_range, self.shear_range)
@@ -169,13 +177,20 @@ class RandomAffine(object):
         return res
 
 
-def affine_transform_via_M(image, M, borderMode=cv2.BORDER_CONSTANT, interp=cv2.INTER_NEAREST):
+def affine_transform_via_M(
+    image, M, borderMode=cv2.BORDER_CONSTANT, interp=cv2.INTER_NEAREST
+):
     imshape = image.shape
     shape_size = imshape[:2]
 
     # Random affine
-    warped = cv2.warpAffine(image.reshape(shape_size + (-1,)), M, shape_size[::-1],
-                            flags=interp, borderMode=borderMode)
+    warped = cv2.warpAffine(
+        image.reshape(shape_size + (-1,)),
+        M,
+        shape_size[::-1],
+        flags=interp,
+        borderMode=borderMode,
+    )
 
     # print(imshape, warped.shape)
 
@@ -185,7 +200,9 @@ def affine_transform_via_M(image, M, borderMode=cv2.BORDER_CONSTANT, interp=cv2.
 
 
 ###### ELASTIC TRANSFORM ######
-def elastic_transform(image, alpha=1000, sigma=30, spline_order=1, mode='nearest', random_state=np.random):
+def elastic_transform(
+    image, alpha=1000, sigma=30, spline_order=1, mode="nearest", random_state=np.random
+):
     """Elastic deformation of image as described in [Simard2003]_.
     .. [Simard2003] Simard, Steinkraus and Platt, "Best Practices for
        Convolutional Neural Networks applied to Visual Document Analysis", in
@@ -195,17 +212,26 @@ def elastic_transform(image, alpha=1000, sigma=30, spline_order=1, mode='nearest
     assert image.ndim == 3
     shape = image.shape[:2]
 
-    dx = gaussian_filter((random_state.rand(*shape) * 2 - 1),
-                         sigma, mode="constant", cval=0) * alpha
-    dy = gaussian_filter((random_state.rand(*shape) * 2 - 1),
-                         sigma, mode="constant", cval=0) * alpha
+    dx = (
+        gaussian_filter(
+            (random_state.rand(*shape) * 2 - 1), sigma, mode="constant", cval=0
+        )
+        * alpha
+    )
+    dy = (
+        gaussian_filter(
+            (random_state.rand(*shape) * 2 - 1), sigma, mode="constant", cval=0
+        )
+        * alpha
+    )
 
-    x, y = np.meshgrid(np.arange(shape[0]), np.arange(shape[1]), indexing='ij')
+    x, y = np.meshgrid(np.arange(shape[0]), np.arange(shape[1]), indexing="ij")
     indices = [np.reshape(x + dx, (-1, 1)), np.reshape(y + dy, (-1, 1))]
     result = np.empty_like(image)
     for i in range(image.shape[2]):
         result[:, :, i] = map_coordinates(
-            image[:, :, i], indices, order=spline_order, mode=mode).reshape(shape)
+            image[:, :, i], indices, order=spline_order, mode=mode
+        ).reshape(shape)
     return result
 
 
@@ -235,35 +261,52 @@ def elastic_transform_nd(image, alpha, sigma, random_state=None, order=1, lazy=F
 
     # Random affine
     blur_size = int(4 * sigma) | 1
-    dx = cv2.GaussianBlur(random_state.rand(*imsize) * 2 - 1,
-                          ksize=(blur_size, blur_size), sigmaX=sigma) * alpha
-    dy = cv2.GaussianBlur(random_state.rand(*imsize) * 2 - 1,
-                          ksize=(blur_size, blur_size), sigmaX=sigma) * alpha
+    dx = (
+        cv2.GaussianBlur(
+            random_state.rand(*imsize) * 2 - 1,
+            ksize=(blur_size, blur_size),
+            sigmaX=sigma,
+        )
+        * alpha
+    )
+    dy = (
+        cv2.GaussianBlur(
+            random_state.rand(*imsize) * 2 - 1,
+            ksize=(blur_size, blur_size),
+            sigmaX=sigma,
+        )
+        * alpha
+    )
 
     # use as_strided to copy things over across n1...nn channels
-    dx = as_strided(dx.astype(np.float32),
-                    strides=(0,) * len(dim) + (4 * shape[1], 4),
-                    shape=dim + (shape[0], shape[1]))
+    dx = as_strided(
+        dx.astype(np.float32),
+        strides=(0,) * len(dim) + (4 * shape[1], 4),
+        shape=dim + (shape[0], shape[1]),
+    )
     dx = np.transpose(dx, axes=(-2, -1) + tuple(range(len(dim))))
 
-    dy = as_strided(dy.astype(np.float32),
-                    strides=(0,) * len(dim) + (4 * shape[1], 4),
-                    shape=dim + (shape[0], shape[1]))
+    dy = as_strided(
+        dy.astype(np.float32),
+        strides=(0,) * len(dim) + (4 * shape[1], 4),
+        shape=dim + (shape[0], shape[1]),
+    )
     dy = np.transpose(dy, axes=(-2, -1) + tuple(range(len(dim))))
 
     coord = np.meshgrid(*[np.arange(shape_i) for shape_i in (shape[1], shape[0]) + dim])
-    indices = [np.reshape(e + de, (-1, 1)) for e, de in zip([coord[1], coord[0]] + coord[2:],
-                                                            [dy, dx] + [0] * len(dim))]
+    indices = [
+        np.reshape(e + de, (-1, 1))
+        for e, de in zip([coord[1], coord[0]] + coord[2:], [dy, dx] + [0] * len(dim))
+    ]
 
     if lazy:
         return indices
 
-    return map_coordinates(image, indices, order=order, mode='reflect').reshape(shape)
+    return map_coordinates(image, indices, order=order, mode="reflect").reshape(shape)
 
 
 class ElasticTransform(object):
-    """Apply elastic transformation on a numpy.ndarray (H x W x C)
-    """
+    """Apply elastic transformation on a numpy.ndarray (H x W x C)"""
 
     def __init__(self, alpha, sigma, order=1):
         self.alpha = alpha
@@ -283,7 +326,6 @@ class ElasticTransform(object):
 
 
 class RandomFlip3D(object):
-
     def __init__(self, h=True, v=True, t=True, p=0.5):
         """
         Randomly flip an image horizontally and/or vertically with

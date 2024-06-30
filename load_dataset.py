@@ -15,10 +15,8 @@ from torch.utils.data import Dataset
 
 import image_transforms as myit
 
-images_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/image*"
-label_images_path = (
-    r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
-)
+images_path = r"./data/CHAOST2/niis/T2SPIR/normalized/image*"
+label_images_path = r"./data/CHAOST2/niis/T2SPIR/normalized/label*"
 
 
 class TestDataset(Dataset):
