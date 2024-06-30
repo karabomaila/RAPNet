@@ -353,6 +353,7 @@ class TrainDataset(Dataset):
 
         # n_way * (n_shot * C) * H * W
         sup_lbl = lbl_cls[sample[: self.n_shot * self.n_way]][None,]
+        print(sup_lbl.shape)
 
         # n_qry * C * H * W
         qry_lbl = lbl_cls[sample[self.n_shot * self.n_way :]]
@@ -378,10 +379,12 @@ class TrainDataset(Dataset):
         if np.random.random(1) > 0.5:
             qry_img, qry_lbl = self.geom_transform(qry_img, qry_lbl)
         else:
+            print(sup_img.shape, sup_lbl.shape)
             (
                 sup_img,
                 sup_lbl,
             ) = self.geom_transform(sup_img, sup_lbl)
+            print(sup_img.shape, sup_lbl.shape)
 
         sample = {
             "support_images": sup_img,
