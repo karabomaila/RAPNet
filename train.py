@@ -466,8 +466,8 @@ def train():
             query_images = [
                 query_image.float() for query_image in sample["query_images"]
             ]
-
             query_images = torch.cat(query_images, dim=1)
+            
             query_labels = torch.cat(
                 [query_label.long() for query_label in sample["query_labels"]], dim=1
             )
