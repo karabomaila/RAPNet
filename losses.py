@@ -102,7 +102,7 @@ class Grad:
         self.penalty: str = penalty
         self.loss_mult = loss_mult
 
-    def _diffs(self, y) -> list[None]:
+    def _diffs(self, y):
         vol_shape = [n for n in y.shape][2:]
         ndims = len(vol_shape)
 
