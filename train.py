@@ -463,7 +463,7 @@ def train():
             # print(f"s_input shape: {s_input.shape}", f"s_mask shape: {s_mask.shape}")
 
             support: torch.Tensor = torch.cat([s_input, s_mask], 2)
-            print(support.shape)
+            # print(support.shape)
             support = support.permute(1, 0, 2, 3, 4)
 
             query_images = [
@@ -484,6 +484,7 @@ def train():
             )
 
             tmp_sprior.append(out.detach().cpu().numpy())
+            print(out.shape, query_images.shape)
             out = F.interpolate(
                 out, size=query_images.shape[1:], mode="bilinear", align_corners=True
             )
