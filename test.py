@@ -9,7 +9,9 @@ import nrrd
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
 
+import load_dataset
 import RAP as fs
 from settings import Settings
 
@@ -30,8 +32,7 @@ def MR_normalize(x_in):
     return x_in / 255
 
 
-def ts_main(ckpt_path) -> None:
-    print("running?")
+def ts_main() -> None:
     settings = Settings()
     # _, data_params, net_params, train_params, eval_params = (
     #     settings["COMMON"],
@@ -55,9 +56,34 @@ def ts_main(ckpt_path) -> None:
 
     # initialize and load the trained model
     model = fs.RAP(net_params)
-    model.load_state_dict(torch.load(ckpt_path, map_location="cpu")["state_dict"])
-    model.cuda()
+    model.load_state_dict(torch.load("./data/1000model.pth", map_location="cpu"))
+    # model.cuda()
     model.eval()
+
+    print("Load data...")
+    data_config = {
+        "n_shot": 1,
+        "n_way": 1,
+        "n_query": 1,
+        "n_sv": 0,
+        "max_iter": 1000,
+        "eval_fold": 0,
+        "min_size": 200,
+        "max_slices": 3,
+        "test_label": [1, 4],
+        "exclude_label": [1, 4],
+        "use_gt": True,
+    }
+
+    test_dataset = load_dataset.TestDataset(data_config)
+    test_loader = DataLoader(
+        train_dataset,
+        batch_size=1,
+        shuffle=True,
+        num_workers=0,
+        pin_memory=True,
+        drop_last=True,
+    )
 
     # data flow and pred
     with torch.no_grad():
@@ -276,6 +302,4 @@ def ts_main(ckpt_path) -> None:
             )
 
 
-print("running?")
-ckpt_path = "/home/karabo/code/Few-shot/data/rap.pth"
-ts = ts_main(ckpt_path)
+ts = ts_main()

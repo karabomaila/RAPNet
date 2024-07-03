@@ -4,14 +4,8 @@ For Evaluation
 Extended from ADNet code by Hansen et al.
 """
 
-import copy
-import os
 import random
-from glob import glob
 
-import cv2
-import nrrd
-import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
@@ -25,14 +19,6 @@ import losses
 import RAP as fs
 from settings import Settings
 
-images_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/image*"
-label_images_path = (
-    r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
-)
-
-support_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/image*"
-query_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
-
 SP_SLICES = 3
 IMAGE_SIZE = 256
 SHOTS = 5
@@ -40,291 +26,6 @@ SHOTS = 5
 
 def MR_normalize(x_in):
     return x_in / 255
-
-
-def ts_main(ckpt_path):
-    print("running?")
-    settings = Settings()  # parse .ini
-    common_params, data_params, net_params, train_params, eval_params = (
-        settings["COMMON"],
-        settings["DATA"],
-        settings["NETWORK"],
-        settings["TRAINING"],
-        settings["EVAL"],
-    )
-
-    # initialize and load the trained model
-    model = fs.RAP(net_params)
-    model.load_state_dict(torch.load(ckpt_path, map_location="cpu")["state_dict"])
-    model.cuda()
-    model.eval()
-
-    all_images_paths = glob(images_path + "/*.nii.gz")
-    all_label_images_paths = glob(label_images_path + "/*.nii.gz")
-
-    all_images_paths = sorted(
-        all_images_paths, key=lambda x: int(x.split("_")[-1].split(".nii.gz")[0])
-    )
-    all_label_images_paths = sorted(
-        all_label_images_paths, key=lambda x: int(x.split("_")[-1].split(".nii.gz")[0])
-    )
-
-    all_query_img_path = glob(query_path + "/*.nii.gz")
-    all_support_img_path = glob(support_path + "/*.nii.gz")
-
-    save_path = "./prediction_la_dice_1000"
-    # if not os.path.exists(save_path):
-    #     os.mkdir(save_path)
-    # else:
-    #     shutil.rmtree(save_path)
-    #     os.mkdir(save_path)
-
-    # data flow and pred
-    support_images = {}
-    support_images_labels = {}
-    query_images = {}
-    query_images_labels = {}
-    with torch.no_grad():
-        for pid in all_query_img_path:
-            print("qid:", pid)
-            query_name = pid.split("\\")[-1].split(".")[0]
-
-            img_query = nrrd.read(pid)[0].transpose(2, 1, 0)
-            mask_query = nrrd.read(pid.replace("im", "m"))[0].transpose(2, 1, 0)
-
-            tmp_support_path = copy.deepcopy(all_support_img_path)
-            try:
-                tmp_support_path.remove(pid)
-            except:
-                pass
-
-            pred_mask = []
-            tmp_sprior = []
-            sp_mask = []
-            for query_slice in range(img_query.shape[0]):
-                if SP_SLICES == 1:
-                    input = cv2.resize(
-                        img_query[query_slice],
-                        dsize=(IMAGE_SIZE, IMAGE_SIZE),
-                        interpolation=cv2.INTER_LINEAR,
-                    )
-                    input = MR_normalize(input)
-                    # 3 or 1 channel input
-                    # input = torch.from_numpy(np.repeat(input[np.newaxis, np.newaxis, ...], 3, 1)).float().cuda()
-                    query = (
-                        torch.from_numpy(input[np.newaxis, np.newaxis, ...])
-                        .float()
-                        .cuda()
-                    )
-
-                else:
-                    # sp_slices == 3
-                    input = cv2.resize(
-                        img_query[query_slice],
-                        dsize=(IMAGE_SIZE, IMAGE_SIZE),
-                        interpolation=cv2.INTER_LINEAR,
-                    )
-                    input = MR_normalize(input)
-                    query = torch.from_numpy(input[np.newaxis, np.newaxis, ...]).float()
-
-                    if query_slice == 0:
-                        query_pre = query
-                    else:
-                        input = cv2.resize(
-                            img_query[query_slice - 1],
-                            dsize=(IMAGE_SIZE, IMAGE_SIZE),
-                            interpolation=cv2.INTER_LINEAR,
-                        )
-
-                        input = MR_normalize(input)
-                        query_pre = torch.from_numpy(
-                            input[np.newaxis, np.newaxis, ...]
-                        ).float()
-
-                    if query_slice == img_query.shape[0] - 1:
-                        query_next = query
-                    else:
-                        input = cv2.resize(
-                            img_query[query_slice + 1],
-                            dsize=(IMAGE_SIZE, IMAGE_SIZE),
-                            interpolation=cv2.INTER_LINEAR,
-                        )
-
-                        input = MR_normalize(input)
-                        query_next = torch.from_numpy(
-                            input[np.newaxis, np.newaxis, ...]
-                        ).float()
-
-                    # finish read query img(1 or 3 slices) and mask (1 slice)
-                    query = torch.cat([query_pre, query, query_next], dim=1).cuda()
-                    mask_query = cv2.resize(
-                        mask_query[query_slice],
-                        dsize=(IMAGE_SIZE, IMAGE_SIZE),
-                        interpolation=cv2.INTER_NEAREST,
-                    )
-
-                # every slice a support
-                support_paths = random.sample(tmp_support_path, SHOTS)
-                print("sids:", support_paths)
-
-                sp_imgs = []
-                sp_msks = []
-                for i in range(SHOTS):
-                    img_support = nrrd.read(support_paths[i])[0].transpose(2, 1, 0)
-                    mask_support = (
-                        nrrd.read(support_paths[i].replace("_im", "_m"))[0]
-                        .transpose(2, 1, 0)
-                        .astype(np.uint8)
-                    )
-                    sp_imgs.append(img_support)
-                    sp_msks.append(mask_support)
-
-                # get cur_slice support
-                s_inputs = []
-                s_masks = []
-                cond_inputs = []
-                for i in range(SHOTS):
-                    img_support = sp_imgs[i]
-                    mask_support = sp_msks[i]
-                    sp_shp0 = img_support.shape[0]
-
-                    if SP_SLICES == 1:
-                        sp_index = int(
-                            query_slice / img_query.shape[0] * img_support.shape[0]
-                        )
-
-                        img_support = cv2.resize(
-                            img_support[sp_index],
-                            dsize=(IMAGE_SIZE, IMAGE_SIZE),
-                            interpolation=cv2.INTER_LINEAR,
-                        )
-
-                        img_support = MR_normalize(img_support)
-                        s_input = (
-                            torch.from_numpy(
-                                img_support[np.newaxis, np.newaxis, np.newaxis, ...]
-                            )
-                            .float()
-                            .cuda()
-                        )
-
-                        msk_support = cv2.resize(
-                            mask_support[sp_index],
-                            dsize=(IMAGE_SIZE, IMAGE_SIZE),
-                            interpolation=cv2.INTER_NEAREST,
-                        )
-                        s_mask = (
-                            torch.from_numpy(
-                                msk_support[np.newaxis, np.newaxis, np.newaxis, ...]
-                            )
-                            .float()
-                            .cuda()
-                        )
-                    else:
-                        # S1
-                        # sp_index = sp_shp0//2
-
-                        # S2
-                        # bias = sp_shp0 / 3 / 2
-                        # ratio = query_slice / img_query.shape[0]
-                        # if ratio < 1 / 3:
-                        #     sp_index = int(bias)
-                        # elif ratio >= 1 / 3 and ratio < 2 / 3:
-                        #     sp_index = int(1 / 3 * sp_shp0 + bias)
-                        # else:
-                        #     sp_index = int(2 / 3 * sp_shp0 + bias)
-
-                        # S3
-                        sp_index = int(query_slice / img_query.shape[0] * sp_shp0)
-
-                        sp_indexes = [
-                            max(sp_index - 1, 0),
-                            sp_index,
-                            min(sp_index + 1, sp_shp0 - 1),
-                        ]
-                        sp_imgs_tmp = []
-                        sp_masks_tmp = []
-                        for sp_index in sp_indexes:
-                            img_support_r = cv2.resize(
-                                img_support[sp_index],
-                                dsize=(IMAGE_SIZE, IMAGE_SIZE),
-                                interpolation=cv2.INTER_LINEAR,
-                            )
-                            img_support_r = MR_normalize(img_support_r)
-                            s_input = (
-                                torch.from_numpy(
-                                    img_support_r[
-                                        np.newaxis, np.newaxis, np.newaxis, ...
-                                    ]
-                                )
-                                .float()
-                                .cuda()
-                            )
-                            sp_imgs_tmp.append(s_input)
-                            msk_support = (
-                                cv2.resize(
-                                    mask_support[sp_index],
-                                    dsize=(IMAGE_SIZE, IMAGE_SIZE),
-                                    interpolation=cv2.INTER_NEAREST,
-                                )
-                                == 1
-                            )
-                            s_mask = (
-                                torch.from_numpy(
-                                    msk_support[np.newaxis, np.newaxis, np.newaxis, ...]
-                                )
-                                .float()
-                                .cuda()
-                            )
-                            sp_masks_tmp.append(s_mask)
-
-                        s_input = torch.cat(sp_imgs_tmp, 2)  # [1,1,slice,H,W]
-                        s_mask = torch.cat(sp_masks_tmp, 2)  # [1,1,slice,H,W]
-
-                    s_inputs.append(s_input)
-                    s_masks.append(s_mask)
-
-                # finish read support img and mask
-                s_input = torch.cat(s_inputs, 1)  # 1, Kshot, slice, h, w
-                s_mask = torch.cat(s_masks, 1)
-
-                # # run model
-                support = torch.cat([s_input, s_mask], 2)  # b, Kshot, slice*2, h, w
-                cond_inputs_ = support.permute(1, 0, 2, 3, 4)  # Kshot, b, slice*2, h, w
-
-                # forward
-                out, sp_pred, max_corr2 = model.segmentor(
-                    query, cond_inputs_, s_mask.permute(1, 0, 2, 3, 4)
-                )
-
-                tmp_sprior.append(out.detach().cpu().numpy())
-                out = F.interpolate(
-                    out, size=img_query.shape[1:], mode="bilinear", align_corners=True
-                )
-                sp_pred = F.interpolate(
-                    sp_pred,
-                    size=img_query.shape[1:],
-                    mode="bilinear",
-                    align_corners=True,
-                )
-
-                output = (out > 0.5).squeeze(1)
-                sp_pred = (sp_pred > 0.5).squeeze(1)
-
-                pred_mask.append(output.cpu().numpy())
-                sp_mask.append(sp_pred.squeeze(1).cpu().numpy())
-
-            pred = np.concatenate(pred_mask, 0)
-            sp = np.concatenate(sp_mask, 0)
-
-            nrrd.write(
-                f"{save_path}/{query_name}_pred.nrrd",
-                pred.transpose(2, 1, 0).astype(np.uint8),
-            )
-            nrrd.write(
-                f"{save_path}/{query_name}_sp.nrrd",
-                sp.transpose(2, 1, 0).astype(np.uint8),
-            )
 
 
 def train():
@@ -345,16 +46,7 @@ def train():
     # _log.handlers.append(file_handler)
     # _log.info(f'Run "{_config["exp_str"]}" with ID "{_run.observers[0].dir[-1]}"')
 
-    # Deterministic setting for reproduciablity.
-    # if _config['seed'] is not None:
-
-    save_path = "./prediction_la_dice_1000"
-    if not os.path.exists(save_path):
-        os.mkdir(save_path)
-    # else:
-    #     shutil.rmtree(save_path)
-    #     os.mkdir(save_path)
-
+    # Deterministic setting for reproducibility.
     random.seed(0)
     torch.manual_seed(0)
     torch.cuda.manual_seed_all(0)
@@ -485,7 +177,7 @@ def train():
             )
 
             tmp_sprior.append(out.detach().cpu().numpy())
-            print(out.shape, query_images.shape)
+            # print(out.shape, query_images.shape)
 
             out = F.interpolate(
                 out, size=[256, 256], mode="bilinear", align_corners=True
@@ -517,10 +209,11 @@ def train():
             )
 
             loss_sp: torch.Tensor = mse.loss(
-                spatial_prior_support, query_labels
-            ) + alpha * dice.loss(spatial_prior_mask, query_labels)
+                query_labels, spatial_prior_support
+            ) + alpha * dice.loss(query_labels, spatial_prior_mask)
 
-            loss_seg: torch.Tensor = dice.loss(pred_mask, query_labels)
+            #  y_true = [torch.from_numpy(d).to(device).float().permute(0, 4, 1, 2, 3) for d in y_true]
+            loss_seg: torch.Tensor = dice.loss(query_labels, output)
 
             loss: torch.Tensor = loss_sp + loss_seg
 

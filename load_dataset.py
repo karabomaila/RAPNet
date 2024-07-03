@@ -20,18 +20,17 @@ label_images_path = r"./data/CHAOST2/niis/T2SPIR/normalized/label*"
 
 
 class TestDataset(Dataset):
-    def __init__(self, args):
+    def __init__(self, args) -> None:
         # reading the paths
-        if args["dataset"] == "CMR":
-            self.image_dirs = glob.glob(
-                os.path.join(args["data_dir"], "cmr_MR_normalized/image*")
-            )
-        elif args["dataset"] == "CHAOST2":
-            self.image_dirs = glob.glob(
-                os.path.join(args["data_dir"], "chaos_MR_T2_normalized/image*")
-            )
-        # elif args['dataset'] == 'SABS':
-        #     self.image_dirs = glob.glob(os.path.join(args['data_dir'], 'sabs_CT_normalized/image*'))
+        # if args["dataset"] == "CMR":
+        #     self.image_dirs: list[str] = glob.glob(
+        #         os.path.join(args["data_dir"], "cmr_MR_normalized/image*")
+        #     )
+        # elif args["dataset"] == "CHAOST2":
+
+        self.image_dirs: list[str] = glob.glob(
+            os.path.join("./data", "chaos_MR_T2_normalized/image*")
+        )
 
         self.image_dirs = sorted(
             self.image_dirs, key=lambda x: int(x.split("_")[-1].split(".nii.gz")[0])
@@ -43,11 +42,11 @@ class TestDataset(Dataset):
 
         # split into support/query
         idx = np.arange(len(self.image_dirs))
-        self.support_dir = self.image_dirs[idx[args["supp_idx"]]]
+        self.support_dir: str = self.image_dirs[idx[args["supp_idx"]]]
         self.image_dirs.pop(idx[args["supp_idx"]])  # remove support
         self.label = None
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.image_dirs)
 
     def __getitem__(self, idx):
@@ -80,7 +79,7 @@ class TestDataset(Dataset):
         Selecting intervals according to Ouyang et al.
         """
         if n_shot == 1:
-            pcts = [0.5]
+            pcts: list[float] = [0.5]
         else:
             half_part = 1 / (n_shot * 2)
             part_interval = (1.0 - 1.0 / n_shot) / (n_shot - 1)
