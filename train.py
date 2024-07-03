@@ -465,6 +465,7 @@ def train():
             support: torch.Tensor = torch.cat([s_input, s_mask], 2)
             # print(support.shape)
             support = support.permute(1, 0, 2, 3, 4)
+            s_mask = s_mask.permute(1, 0, 2, 3, 4)
 
             query_images = [
                 query_image.float() for query_image in sample["query_images"]
@@ -480,18 +481,19 @@ def train():
             out, sp_pred, max_corr2, sp_img_prior = model(
                 query_images,
                 support,
-                s_mask.permute(1, 0, 2, 3, 4),
+                s_mask,
             )
 
             tmp_sprior.append(out.detach().cpu().numpy())
             print(out.shape, query_images.shape)
+
             out = F.interpolate(
-                out, size=query_images.shape[1:], mode="bilinear", align_corners=True
+                out, size=[256, 256], mode="bilinear", align_corners=True
             )
 
             sp_pred = F.interpolate(
                 sp_pred,
-                size=query_images.shape[1:],
+                size=[256, 256],
                 mode="bilinear",
                 align_corners=True,
             )
@@ -505,12 +507,13 @@ def train():
             # pred = np.concatenate(pred_mask, 0)
             # sp = np.concatenate(sp_mask, 0)
 
-            flow = spatial_branch.forward(support_images, query_images)
+            flow = spatial_branch.forward(support[0][:, :3], query_images)
             spatial_prior_support: torch.Tensor = spatial_transformer.forward(
-                support_images, flow
+                support[0][:, 1:2, ...], flow
             )
+
             spatial_prior_mask: torch.Tensor = spatial_transformer.forward(
-                support_fg_mask, flow
+                s_mask[0][:, 1:2, ...], flow
             )
 
             loss_sp: torch.Tensor = mse.loss(
@@ -557,7 +560,7 @@ def train():
             #     loss_list.append(curr_loss.item())
             #     loss += curr_loss
 
-            # backpropagate and optimize
+            # back propagate and optimize
             # optimizer.zero_grad()
             # loss.backward()
             # optimizer.step()
@@ -590,7 +593,7 @@ def train():
                 print("###### Taking snapshot ######")
                 torch.save(
                     model.state_dict(),
-                    f"/home/karabo/code/Few-shot/data/{i_iter + 1}model.pth",
+                    f"./data/{i_iter + 1}model.pth",
                 )
 
             i_iter += 1
