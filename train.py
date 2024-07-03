@@ -7,7 +7,6 @@ Extended from ADNet code by Hansen et al.
 import random
 
 import torch
-import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim
@@ -50,11 +49,11 @@ def train():
     random.seed(0)
     torch.manual_seed(0)
     torch.cuda.manual_seed_all(0)
-    cudnn.deterministic = True
+    # cudnn.deterministic = True
 
     # Enable cuDNN benchmark mode to select the fastest convolution algorithm.
-    cudnn.enabled = True
-    cudnn.benchmark = True
+    # cudnn.enabled = True
+    # cudnn.benchmark = True
     print(torch.cuda.is_available())
     d = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # torch.cuda.set_device(device=0)

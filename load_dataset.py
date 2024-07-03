@@ -4,7 +4,6 @@ Extended from ADNet code by Hansen et al.
 """
 
 import glob
-import os
 import random
 
 import numpy as np
@@ -28,9 +27,7 @@ class TestDataset(Dataset):
         #     )
         # elif args["dataset"] == "CHAOST2":
 
-        self.image_dirs: list[str] = glob.glob(
-            os.path.join("./data", "chaos_MR_T2_normalized/image*")
-        )
+        self.image_dirs: list[str] = glob.glob(images_path)
 
         self.image_dirs = sorted(
             self.image_dirs, key=lambda x: int(x.split("_")[-1].split(".nii.gz")[0])
@@ -52,6 +49,7 @@ class TestDataset(Dataset):
     def __getitem__(self, idx):
         img_path = self.image_dirs[idx]
         img = sitk.GetArrayFromImage(sitk.ReadImage(img_path))
+
         img = (img - img.mean()) / img.std()
         img = np.stack(3 * [img], axis=1)
 
@@ -119,6 +117,8 @@ class TestDataset(Dataset):
 
             sample["image"] = torch.from_numpy(img[idx][idx_])
             sample["label"] = torch.from_numpy(lbl[idx][idx_])
+        # sup_lbl = sup_lbl[np.newaxis, ...]
+        # sup_img = sup_img[np.newaxis, ...]
 
         return sample
 
