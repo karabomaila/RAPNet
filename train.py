@@ -158,7 +158,7 @@ def train():
             print(f"s_input shape: {s_input.shape}", f"s_mask shape: {s_mask.shape}")
 
             support: torch.Tensor = torch.cat([s_input, s_mask], 2)
-            # print(support.shape)
+
             support = support.permute(1, 0, 2, 3, 4)
             s_mask = s_mask.permute(1, 0, 2, 3, 4)
 
@@ -166,14 +166,10 @@ def train():
                 query_image.float() for query_image in sample["query_images"]
             ]
             query_images = torch.cat(query_images, dim=1)  # [1, 3, 256, 256]
-            # print(query_images.shape)
 
             query_labels: torch.Tensor = torch.cat(
                 [query_label.long() for query_label in sample["query_labels"]], dim=1
             )  # [1, 256, 256]
-            print(query_labels.shape)
-
-            assert False
 
             # Compute outputs and losses.
             # print(query_image.shape, support_image.shape, support_mask.shape)
