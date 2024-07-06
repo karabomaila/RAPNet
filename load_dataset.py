@@ -67,8 +67,8 @@ class TestDataset(Dataset):
 
         # Evaluation protocol.
         idx = lbl.sum(axis=(1, 2)) > 0
-        sample["image"] = torch.from_numpy(img[idx])
-        sample["label"] = torch.from_numpy(lbl[idx])
+        sample["image"] = torch.from_numpy(img[idx])  # [32, 3, 256, 256]
+        sample["label"] = torch.from_numpy(lbl[idx])  # [32, 256, 256]
         # sample['padding_mask'] = np.zeros_like(sample['label'])
         return sample
 
@@ -106,6 +106,8 @@ class TestDataset(Dataset):
 
         sample = {}
         if all_slices:
+            img = img[np.newaxis, ...]
+            lbl = lbl[np.newaxis, ...]
             sample["image"] = torch.from_numpy(img)
             sample["label"] = torch.from_numpy(lbl)
         else:
@@ -115,8 +117,20 @@ class TestDataset(Dataset):
             idx = lbl.sum(axis=(1, 2)) > 0
             idx_ = self.get_support_index(N, idx.sum())
 
-            sample["image"] = torch.from_numpy(img[idx][idx_])
-            sample["label"] = torch.from_numpy(lbl[idx][idx_])
+            img = img[idx][idx_]
+            img = img[np.newaxis, ...]  # [1, 3, 3, 256, 256]
+
+            lbl = np.stack(3 * [lbl], axis=1)
+            lbl = lbl[idx][idx_]
+            lbl = lbl[np.newaxis, ...]  # [1, 3, 3, 256, 256]
+
+            sample["image"] = torch.from_numpy(img)
+            sample["image"] = sample["image"].permute(1, 0, 2, 3, 4)
+
+            print("Image: ", sample["image"].shape)
+            sample["label"] = torch.from_numpy(lbl)
+            sample["label"] = sample["label"].permute(1, 0, 2, 3, 4)
+            print("label: ", sample["label"].shape)
         # sup_lbl = sup_lbl[np.newaxis, ...]
         # sup_img = sup_img[np.newaxis, ...]
 
