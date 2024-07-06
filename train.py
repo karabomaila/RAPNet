@@ -165,11 +165,15 @@ def train():
             query_images = [
                 query_image.float() for query_image in sample["query_images"]
             ]
-            query_images = torch.cat(query_images, dim=1)
+            query_images = torch.cat(query_images, dim=1)  # [1, 3, 256, 256]
+            # print(query_images.shape)
 
             query_labels: torch.Tensor = torch.cat(
                 [query_label.long() for query_label in sample["query_labels"]], dim=1
-            )
+            )  # [1, 256, 256]
+            print(query_labels.shape)
+
+            assert False
 
             # Compute outputs and losses.
             # print(query_image.shape, support_image.shape, support_mask.shape)
