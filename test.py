@@ -1,27 +1,22 @@
 import copy
+import logging
 import os
 import random
-import shutil
-from glob import glob
 
 import cv2
 import nrrd
 import numpy as np
+import SimpleITK as sitk
 import torch
 import torch.nn.functional as F
+import torch.optim
 from torch.utils.data import DataLoader
 
 import load_dataset
 import RAP as fs
+from dataset_specifics import get_label_names
 from settings import Settings
-
-images_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/image*"
-label_images_path = (
-    r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
-)
-
-support_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/image*"
-query_path = r"/home/karabo/code/Few-shot/data/CHAOST2/niis/T2SPIR/normalized/label*"
+from utils import Scores
 
 SP_SLICES = 3
 IMAGE_SIZE = 256
@@ -44,23 +39,22 @@ def ts_main() -> None:
 
     net_params = settings["NETWORK"]
 
-    all_query_img_path: list[str] = glob(query_path + "/*.nii.gz")
-    all_support_img_path: list[str] = glob(support_path + "/*.nii.gz")
+    all_query_img_path: list[str] = []
+    all_support_img_path: list[str] = []
 
-    save_path = "./prediction_la_dice_1000"
-    if not os.path.exists(save_path):
-        os.mkdir(save_path)
-    else:
-        shutil.rmtree(save_path)
-        os.mkdir(save_path)
+    # Deterministic setting for reproducibility.
+    random.seed(0)
+    torch.manual_seed(0)
+    torch.cuda.manual_seed_all(0)
 
     # initialize and load the trained model
+    logging.info("Create model...")
     model = fs.RAP(net_params)
     model.load_state_dict(torch.load("./data/1000model.pth", map_location="cpu"))
     # model.cuda()
     model.eval()
 
-    print("Load data...")
+    logging.info("Load data...")
     data_config = {
         "n_shot": 1,
         "n_way": 1,
@@ -73,17 +67,123 @@ def ts_main() -> None:
         "test_label": [1, 4],
         "exclude_label": [1, 4],
         "use_gt": True,
+        "supp_idx": 0,
     }
+    n_part = 3
 
     test_dataset = load_dataset.TestDataset(data_config)
     test_loader = DataLoader(
-        train_dataset,
+        test_dataset,
         batch_size=1,
         shuffle=True,
         num_workers=0,
         pin_memory=True,
         drop_last=True,
     )
+
+    # Get unique labels (classes).
+    labels = get_label_names("CHAOST2")
+
+    # Loop over classes.
+    class_dice = {}
+    class_iou = {}
+
+    logging.info("Starting validation...")
+    for label_val, label_name in labels.items():
+        # Skip BG class.
+        if label_name == "BG":
+            continue
+        elif not np.intersect1d([label_val], data_config["test_label"]):
+            continue
+
+        logging.info(f"Test Class: {label_name}")
+
+        # Get support sample + mask for the current class.
+        support_sample = test_dataset.getSupport(
+            label=label_val, all_slices=False, N=n_part
+        )
+        test_dataset.label = label_val
+
+        # Test.
+        with torch.no_grad():
+            model.eval()
+
+            # Unpack support data.
+            support_image = [
+                support_sample["image"][[i]].float()
+                for i in range(support_sample["image"].shape[0])
+            ]  # n_shot x 3 x H x W
+            support_fg_mask = [
+                support_sample["label"][[i]].float()
+                for i in range(support_sample["image"].shape[0])
+            ]  # n_shot x H x W
+
+            # Loop through query volumes.
+            scores = Scores()
+            for i, sample in enumerate(test_loader):
+                # Unpack query data.
+                query_image = [
+                    sample["image"][i].float() for i in range(sample["image"].shape[0])
+                ]  # [C x 3 x H x W]
+                query_label = sample["label"].long()  # C x H x W
+                query_id = sample["id"][0].split("image_")[1][: -len(".nii.gz")]
+
+                # Compute output.
+                # Match support slice and query sub-chunck.
+                query_pred = torch.zeros(query_label.shape[-3:])
+                C_q = sample["image"].shape[1]
+                idx_ = np.linspace(0, C_q, n_part + 1).astype("int")
+
+                for sub_chunck in range(n_part):
+                    support_image_s = [support_image[sub_chunck]]  # 1 x 3 x H x W
+                    support_fg_mask_s = [support_fg_mask[sub_chunck]]  # 1 x H x W
+                    query_image_s = query_image[0][
+                        idx_[sub_chunck] : idx_[sub_chunck + 1]
+                    ]  # C' x 3 x H x W
+
+                    query_pred_s = []
+                    for i in range(query_image_s.shape[0]):
+                        _pred_s, _ = model(
+                            [support_image_s],
+                            [support_fg_mask_s],
+                            [query_image_s[[i]]],
+                            n_iters=n_part,
+                        )  # C x 2 x H x W
+                        query_pred_s.append(_pred_s)
+
+                    query_pred_s = torch.cat(query_pred_s, dim=0)
+                    query_pred_s = query_pred_s.argmax(dim=1).cpu()  # C x H x W
+                    query_pred[idx_[sub_chunck] : idx_[sub_chunck + 1]] = query_pred_s
+
+                # Record scores.
+                scores.record(query_pred, query_label)
+
+                # Log.
+                # _log.info(
+                #     f'Tested query volume: {sample["id"][0][len(_config["path"][_config["dataset"]]["data_dir"]):]}.'
+                # )
+                # _log.info(f"Dice score: {scores.patient_dice[-1].item()}")
+
+                # Save predictions.
+                file_name: str = os.path.join(
+                    "./data",
+                    f"prediction_{query_id}_{label_name}.nii.gz",
+                )
+                itk_pred = sitk.GetImageFromArray(query_pred)
+                sitk.WriteImage(itk_pred, file_name, True)
+                logging.info(f"{query_id} has been saved. ")
+
+            # Log class-wise results
+            class_dice[label_name] = torch.tensor(scores.patient_dice).mean().item()
+            class_iou[label_name] = torch.tensor(scores.patient_iou).mean().item()
+            logging.info(f"Test Class: {label_name}")
+            logging.info(f"Mean class IoU: {class_iou[label_name]}")
+            logging.info(f"Mean class Dice: {class_dice[label_name]}")
+
+    logging.info("Final results...")
+    logging.info(f"Mean IoU: {class_iou}")
+    logging.info(f"Mean Dice: {class_dice}")
+    logging.info("End of validation.")
 
     # data flow and pred
     with torch.no_grad():
@@ -292,14 +392,15 @@ def ts_main() -> None:
             pred = np.concatenate(pred_mask, 0)
             sp = np.concatenate(sp_mask, 0)
 
-            nrrd.write(
-                f"{save_path}/{query_name}_pred.nrrd",
-                pred.transpose(2, 1, 0).astype(np.uint8),
-            )
-            nrrd.write(
-                f"{save_path}/{query_name}_sp.nrrd",
-                sp.transpose(2, 1, 0).astype(np.uint8),
-            )
+            # nrrd.write(
+            #     f"{save_path}/{query_name}_pred.nrrd",
+            #     pred.transpose(2, 1, 0).astype(np.uint8),
+            # )
+            # nrrd.write(
+            #     f"{save_path}/{query_name}_sp.nrrd",
+            #     sp.transpose(2, 1, 0).astype(np.uint8),
+            # )
 
 
-ts = ts_main()
+if __name__ == "__main__":
+    ts_main()

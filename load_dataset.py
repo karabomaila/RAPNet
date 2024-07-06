@@ -37,7 +37,7 @@ class TestDataset(Dataset):
         # self.FOLD = get_folds(args['dataset'])
         # self.image_dirs = [elem for idx, elem in enumerate(self.image_dirs) if idx in self.FOLD[args['eval_fold']]]
 
-        # split into support/query
+        # split into support and query
         idx = np.arange(len(self.image_dirs))
         self.support_dir: str = self.image_dirs[idx[args["supp_idx"]]]
         self.image_dirs.pop(idx[args["supp_idx"]])  # remove support
