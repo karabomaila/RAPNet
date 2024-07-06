@@ -104,19 +104,22 @@ def ts_main() -> None:
         )
         test_dataset.label = label_val
 
-        # Test.
         with torch.no_grad():
-            model.eval()
-
             # Unpack support data.
             support_image = [
                 support_sample["image"][[i]].float()
                 for i in range(support_sample["image"].shape[0])
-            ]  # n_shot x 3 x H x W
+            ]  # 1 x n_part x 3 x H x W
+
             support_fg_mask = [
                 support_sample["label"][[i]].float()
                 for i in range(support_sample["image"].shape[0])
-            ]  # n_shot x H x W
+            ]  # 1 x n-part x H x W
+
+            s_input = torch.cat(support_image, 1)
+            s_mask = torch.cat(support_fg_mask, 1)
+            print(f"s_input shape: {s_input.shape}", f"s_mask shape: {s_mask.shape}")
+            # assert False
 
             # Loop through query volumes.
             scores = Scores()
@@ -125,6 +128,7 @@ def ts_main() -> None:
                 query_image = [
                     sample["image"][i].float() for i in range(sample["image"].shape[0])
                 ]  # [C x 3 x H x W]
+
                 query_label = sample["label"].long()  # C x H x W
                 query_id = sample["id"][0].split("image_")[1][: -len(".nii.gz")]
 
@@ -134,11 +138,12 @@ def ts_main() -> None:
                 C_q = sample["image"].shape[1]
                 idx_ = np.linspace(0, C_q, n_part + 1).astype("int")
 
-                for sub_chunck in range(n_part):
-                    support_image_s = [support_image[sub_chunck]]  # 1 x 3 x H x W
-                    support_fg_mask_s = [support_fg_mask[sub_chunck]]  # 1 x H x W
+                for sub_chunk in range(n_part):
+                    support_image_s = [support_image[sub_chunk]]  # 1 x 3 x H x W
+                    support_fg_mask_s = [support_fg_mask[sub_chunk]]  # 1 x H x W
+
                     query_image_s = query_image[0][
-                        idx_[sub_chunck] : idx_[sub_chunck + 1]
+                        idx_[sub_chunk] : idx_[sub_chunk + 1]
                     ]  # C' x 3 x H x W
 
                     query_pred_s = []
