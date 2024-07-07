@@ -388,7 +388,7 @@ class SDnetSegmentor(nn.Module):
             max_corr_e3.float(), size=(query_image.shape[-2:]), mode="nearest"
         ).requires_grad_()
 
-        return logit, sp_prior, max_corr, sp_img_prior
+        return logit, max_corr, sp_img_prior, sp_prior
 
 
 class RAP(nn.Module):

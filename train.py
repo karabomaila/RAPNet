@@ -61,7 +61,7 @@ def train():
 
     print("Create model...")
     settings = Settings()  # parse .ini
-    common_params, data_params, net_params, train_params, eval_params = (
+    common_params, data_params, net_params, train_params, _ = (
         settings["COMMON"],
         settings["DATA"],
         settings["NETWORK"],
@@ -90,8 +90,8 @@ def train():
     # my_weight = torch.FloatTensor([0.1, 1.0])
     # criterion = nn.NLLLoss(ignore_index=255, weight=my_weight)
 
-    spatial_branch = fs.U_Network(2, [16, 32, 32, 32], [32, 32, 32, 32, 8, 8])
-    spatial_transformer = fs.SpatialTransformer((256, 256))
+    # spatial_branch = fs.U_Network(2, [16, 32, 32, 32], [32, 32, 32, 32, 8, 8])
+    # spatial_transformer = fs.SpatialTransformer((256, 256))
 
     mse = losses.MSE()
     dice = losses.Dice()
@@ -168,7 +168,7 @@ def train():
             )  # [1, 256, 256]
 
             # Compute outputs and losses.
-            out, sp_pred, max_corr2, sp_img_prior = model(
+            out, max_corr, sp_img_prior, sp_mask_prior = model(
                 query_images,
                 support,
                 s_mask,
@@ -179,15 +179,14 @@ def train():
             out = F.interpolate(
                 out, size=[256, 256], mode="bilinear", align_corners=True
             )
+            output = (out > 0.5).squeeze(1)
 
             sp_pred = F.interpolate(
-                sp_pred,
+                sp_mask_prior,
                 size=[256, 256],
                 mode="bilinear",
                 align_corners=True,
             )
-
-            output = (out > 0.5).squeeze(1)
             sp_pred = (sp_pred > 0.5).squeeze(1)
 
             pred_mask.append(output.cpu().numpy())
@@ -196,18 +195,18 @@ def train():
             # pred = np.concatenate(pred_mask, 0)
             # sp = np.concatenate(sp_mask, 0)
 
-            flow = spatial_branch.forward(support[0][:, :3], query_images)
-            spatial_prior_support: torch.Tensor = spatial_transformer.forward(
-                support[0][:, 1:2, ...], flow
-            )
+            # flow = spatial_branch.forward(support[0][:, :3], query_images)
+            # spatial_prior_support: torch.Tensor = spatial_transformer.forward(
+            #     support[0][:, 1:2, ...], flow
+            # )
 
-            spatial_prior_mask: torch.Tensor = spatial_transformer.forward(
-                s_mask[0][:, 1:2, ...], flow
-            )
+            # spatial_prior_mask: torch.Tensor = spatial_transformer.forward(
+            #     s_mask[0][:, 1:2, ...], flow
+            # )
 
             loss_sp: torch.Tensor = mse.loss(
-                query_labels, spatial_prior_support
-            ) + alpha * dice.loss(query_labels, spatial_prior_mask)
+                query_labels, sp_img_prior
+            ) + alpha * dice.loss(query_labels, sp_mask_prior)
 
             #  y_true = [torch.from_numpy(d).to(device).float().permute(0, 4, 1, 2, 3) for d in y_true]
             loss_seg: torch.Tensor = dice.loss(query_labels, output)

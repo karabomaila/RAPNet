@@ -19,6 +19,11 @@ SP_SLICES = 3
 IMAGE_SIZE = 256
 SHOTS = 1
 
+logging.basicConfig(
+    filename="./data/logs.log",
+    format="[%(asctime)s] %(levelname)s %(name)s %(threadName)s : %(message)s",
+)
+
 
 def MR_normalize(x_in):
     return x_in / 255
@@ -35,9 +40,6 @@ def ts_main() -> None:
     # )
 
     net_params = settings["NETWORK"]
-
-    all_query_img_path: list[str] = []
-    all_support_img_path: list[str] = []
 
     # Deterministic setting for reproducibility.
     random.seed(0)
@@ -160,7 +162,7 @@ def ts_main() -> None:
                         #     n_iters=n_part,
                         # )  # C x 2 x H x W
 
-                        out, sp_pred, max_corr2, sp_img_prior = model(
+                        out, max_corr, sp_img_prior, sp_mask_prior = model(
                             query_image_s[[i]],
                             support,
                             s_mask,
@@ -171,7 +173,7 @@ def ts_main() -> None:
                         )
 
                         sp_pred = F.interpolate(
-                            sp_pred,
+                            sp_mask_prior,
                             size=[256, 256],
                             mode="bilinear",
                             align_corners=True,
