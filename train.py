@@ -5,6 +5,7 @@ Extended from ADNet code by Hansen et al.
 """
 
 import random
+from typing import Any
 
 import torch
 import torch.nn.functional as F
@@ -72,20 +73,19 @@ def train():
     model.train()
 
     print("Set optimizer...")
-    optim: dict[str, float] = {
-        "lr": 1e-3,
-        "momentum": 0.9,
-        "weight_decay": 0.0005,
+    optim: dict[str, Any] = {
+        "lr": train_params["learning_rate"],
+        "weight_decay": train_params["optim_weight_decay"],
+        "betas": train_params["optim_betas"],
+        "eps": train_params["optim_eps"],
     }
-    lr_step_gamma = 0.95
     # set optimizer
-    lr = 5e-5
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-
-    # optimizer = torch.optim.SGD(model.parameters(), **optim)
+    optimizer = torch.optim.Adam(model.parameters(), **optim)
     lr_milestones: list[int] = [(ii + 1) * 1000 for ii in range(1000 // 1000 - 1)]
 
-    scheduler = MultiStepLR(optimizer, milestones=lr_milestones, gamma=lr_step_gamma)
+    scheduler = MultiStepLR(
+        optimizer, milestones=lr_milestones, gamma=train_params["lr_scheduler_gamma"]
+    )
 
     # my_weight = torch.FloatTensor([0.1, 1.0])
     # criterion = nn.NLLLoss(ignore_index=255, weight=my_weight)
@@ -204,8 +204,6 @@ def train():
             spatial_prior_mask: torch.Tensor = spatial_transformer.forward(
                 s_mask[0][:, 1:2, ...], flow
             )
-            # set the gradients to zero
-            optimizer.zero_grad()
 
             loss_sp: torch.Tensor = mse.loss(
                 query_labels, spatial_prior_support
@@ -248,11 +246,10 @@ def train():
             #     loss_list.append(curr_loss.item())
             #     loss += curr_loss
 
-            # back propagate and optimize
-            # optimizer.zero_grad()
-            # loss.backward()
-            # optimizer.step()
+            # set the gradients to zero
+            optimizer.zero_grad()
 
+            # back propagate and optimize
             loss.backward()
             optimizer.step()
             scheduler.step()
