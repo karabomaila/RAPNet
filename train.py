@@ -7,7 +7,6 @@ Extended from ADNet code by Hansen et al.
 import random
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim
 from torch.optim.lr_scheduler import MultiStepLR
@@ -80,14 +79,16 @@ def train():
     }
     lr_step_gamma = 0.95
     # set optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr_step_gamma)
-    optimizer = torch.optim.SGD(model.parameters(), **optim)
+    lr = 5e-5
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    # optimizer = torch.optim.SGD(model.parameters(), **optim)
     lr_milestones: list[int] = [(ii + 1) * 1000 for ii in range(1000 // 1000 - 1)]
 
     scheduler = MultiStepLR(optimizer, milestones=lr_milestones, gamma=lr_step_gamma)
 
-    my_weight = torch.FloatTensor([0.1, 1.0])
-    criterion = nn.NLLLoss(ignore_index=255, weight=my_weight)
+    # my_weight = torch.FloatTensor([0.1, 1.0])
+    # criterion = nn.NLLLoss(ignore_index=255, weight=my_weight)
 
     spatial_branch = fs.U_Network(2, [16, 32, 32, 32], [32, 32, 32, 32, 8, 8])
     spatial_transformer = fs.SpatialTransformer((256, 256))
@@ -136,13 +137,9 @@ def train():
             sp_mask = []
 
             # Prepare episode data.
-            # print(sample)
             support_images = [
                 [shot.float() for shot in way] for way in sample["support_images"]
             ]
-            # print(
-            #     len(support_images), len(support_images[0]), support_images[0][0].shape
-            # )
             # [1, 1, 3, 256, 256]
 
             support_fg_mask = [
@@ -155,7 +152,6 @@ def train():
             s_mask: torch.Tensor = torch.cat(
                 support_fg_mask[0], 1
             )  # [1, 1, 3, 256, 256]
-            print(f"s_input shape: {s_input.shape}", f"s_mask shape: {s_mask.shape}")
 
             support: torch.Tensor = torch.cat([s_input, s_mask], 2)
 
@@ -172,7 +168,6 @@ def train():
             )  # [1, 256, 256]
 
             # Compute outputs and losses.
-            # print(query_image.shape, support_image.shape, support_mask.shape)
             out, sp_pred, max_corr2, sp_img_prior = model(
                 query_images,
                 support,
@@ -180,7 +175,6 @@ def train():
             )
 
             tmp_sprior.append(out.detach().cpu().numpy())
-            # print(out.shape, query_images.shape)
 
             out = F.interpolate(
                 out, size=[256, 256], mode="bilinear", align_corners=True
@@ -210,6 +204,8 @@ def train():
             spatial_prior_mask: torch.Tensor = spatial_transformer.forward(
                 s_mask[0][:, 1:2, ...], flow
             )
+            # set the gradients to zero
+            optimizer.zero_grad()
 
             loss_sp: torch.Tensor = mse.loss(
                 query_labels, spatial_prior_support
@@ -242,10 +238,6 @@ def train():
             # )
 
             # loss = query_loss + support_loss
-
-            # Compute gradient and do SGD step.
-            for param in model.parameters():
-                param.grad = None
 
             # calculate total loss
             # weights = [0.5, 0.5]
