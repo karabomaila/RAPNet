@@ -204,9 +204,11 @@ def train():
             #     s_mask[0][:, 1:2, ...], flow
             # )
 
-            loss_sp: torch.Tensor = mse.loss(
-                query_labels, sp_img_prior
-            ) + alpha * dice.loss(query_labels, sp_mask_prior)
+            loss_sp: torch.Tensor = (
+                mse.loss(query_labels, sp_img_prior)
+                + alpha * dice.loss(query_labels, sp_mask_prior)
+                # + beta * 1
+            )
 
             #  y_true = [torch.from_numpy(d).to(device).float().permute(0, 4, 1, 2, 3) for d in y_true]
             loss_seg: torch.Tensor = dice.loss(query_labels, output)
