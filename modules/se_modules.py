@@ -2,7 +2,7 @@
 Squeeze and Excitation Module
 *****************************
 
-Collection of squeeze and excitation classes where each can be inserted as a block into a neural network architechture
+Collection of squeeze and excitation classes where each can be inserted as a block into a neural network architecture
 
     1. `Channel Squeeze and Excitation <https://arxiv.org/abs/1709.01507>`_
     2. `Spatial Squeeze and Excitation <https://arxiv.org/abs/1803.02579>`_
@@ -24,7 +24,7 @@ class ChannelSELayer(nn.Module):
 
     """
 
-    def __init__(self, num_channels, reduction_ratio=2):
+    def __init__(self, num_channels, reduction_ratio=2) -> None:
         """
 
         :param num_channels: No of input channels
@@ -40,7 +40,6 @@ class ChannelSELayer(nn.Module):
 
     def forward(self, input_tensor):
         """
-
         :param input_tensor: X, shape = (batch_size, num_channels, H, W)
         :return: output tensor
         """
@@ -63,18 +62,16 @@ class SpatialSELayer(nn.Module):
         *Roy et al., Concurrent Spatial and Channel Squeeze & Excitation in Fully Convolutional Networks, MICCAI 2018*
     """
 
-    def __init__(self, num_channels):
+    def __init__(self, num_channels) -> None:
         """
-
-        :param num_channels: No of input channels
+        :param num_channels: Number of input channels
         """
         super(SpatialSELayer, self).__init__()
         self.conv = nn.Conv2d(num_channels, 1, 1)
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, input_tensor, weights=None):
+    def forward(self, input_tensor, weights=None) -> torch.Tensor:
         """
-
         :param weights: weights for few shot learning
         :param input_tensor: X, shape = (batch_size, num_channels, H, W)
         :return: output_tensor
@@ -91,10 +88,9 @@ class SpatialSELayer(nn.Module):
         squeeze_tensor = self.sigmoid(out)
 
         # spatial excitation
-        # print(input_tensor.size(), squeeze_tensor.size())
         squeeze_tensor = squeeze_tensor.view(batch_size, 1, a, b)
         output_tensor = torch.mul(input_tensor, squeeze_tensor)
-        #output_tensor = torch.mul(input_tensor, squeeze_tensor)
+
         return output_tensor
 
 
@@ -104,10 +100,9 @@ class ChannelSpatialSELayer(nn.Module):
         *Roy et al., Concurrent Spatial and Channel Squeeze & Excitation in Fully Convolutional Networks, MICCAI 2018, arXiv:1803.02579*
     """
 
-    def __init__(self, num_channels, reduction_ratio=2):
+    def __init__(self, num_channels, reduction_ratio=2) -> None:
         """
-
-        :param num_channels: No of input channels
+        :param num_channels: Number of input channels
         :param reduction_ratio: By how much should the num_channels should be reduced
         """
         super(ChannelSpatialSELayer, self).__init__()
@@ -116,7 +111,6 @@ class ChannelSpatialSELayer(nn.Module):
 
     def forward(self, input_tensor):
         """
-
         :param input_tensor: X, shape = (batch_size, num_channels, H, W)
         :return: output_tensor
         """
@@ -138,7 +132,8 @@ class SELayer(Enum):
         elif self.se_block_type == se.SELayer.CSSE.value:
             self.SELayer = se.ChannelSpatialSELayer(params['num_filters'])
     """
-    NONE = 'NONE'
-    CSE = 'CSE'
-    SSE = 'SSE'
-    CSSE = 'CSSE'
+
+    NONE = "NONE"
+    CSE = "CSE"
+    SSE = "SSE"
+    CSSE = "CSSE"
