@@ -154,6 +154,7 @@ def ts_main() -> None:
                     ]  # C' x 3 x H x W
 
                     query_pred_s = []
+                    query_pred_s2 = []
                     for i in range(query_image_s.shape[0]):
                         # _pred_s, _ = model(
                         #     [support_image_s],
@@ -179,14 +180,17 @@ def ts_main() -> None:
                             align_corners=True,
                         )
 
-                        # output = (out > 0.5).squeeze(1)
+                        output = (out > 0.5).squeeze(1)
                         # sp_pred = (sp_pred > 0.5).squeeze(1)
 
                         # pred_mask.append(output.cpu().numpy())
                         # sp_mask.append(sp_pred.squeeze(1).cpu().numpy())
                         query_pred_s.append(out)
+                        query_pred_s2.append(output.cpu().numpy())
 
                     query_pred_s = torch.cat(query_pred_s, dim=0)
+                    query_pred_s2 = np.concatenate(query_pred_s2, 0)
+
                     query_pred_s = query_pred_s.argmax(dim=1).cpu()  # C x H x W
                     query_pred[idx_[sub_chunk] : idx_[sub_chunk + 1]] = query_pred_s
 
@@ -205,7 +209,7 @@ def ts_main() -> None:
                     f"prediction_{query_id}_{label_name}.nii.gz",
                 )
 
-                itk_pred = sitk.GetImageFromArray(query_pred)
+                itk_pred = sitk.GetImageFromArray(query_pred_s2.astype(np.uint8))
                 sitk.WriteImage(itk_pred, file_name, True)
                 logging.info(f"{query_id} has been saved. ")
 
