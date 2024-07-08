@@ -17,6 +17,7 @@ import load_dataset
 import losses
 import RAP as fs
 from settings import Settings
+from utils import set_logger
 
 SP_SLICES = 3
 IMAGE_SIZE = 256
@@ -28,22 +29,7 @@ def MR_normalize(x_in):
 
 
 def train():
-    # if _run.observers:
-    # Set up source folder
-    # os.makedirs(f'{_run.observers[0].dir}/snapshots', exist_ok=True)
-    # for source_file, _ in _run.experiment_info['sources']:
-    #     os.makedirs(os.path.dirname(f'{_run.observers[0].dir}/source/{source_file}'),
-    #                 exist_ok=True)
-    #     _run.observers[0].save_file(source_file, f'source/{source_file}')
-    # shutil.rmtree(f'{_run.observers[0].basedir}/_sources')
-
-    # # Set up logger -> log to .txt
-    # file_handler = logging.FileHandler(os.path.join(f'{_run.observers[0].dir}', f'logger.log'))
-    # file_handler.setLevel('INFO')
-    # formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
-    # file_handler.setFormatter(formatter)
-    # _log.handlers.append(file_handler)
-    # _log.info(f'Run "{_config["exp_str"]}" with ID "{_run.observers[0].dir[-1]}"')
+    logger = set_logger("./data/logs.log")
 
     # Deterministic setting for reproducibility.
     random.seed(0)
@@ -60,6 +46,7 @@ def train():
     torch.set_num_threads(1)
 
     print("Create model...")
+    logger.info("Create model...")
     settings = Settings()  # parse .ini
     common_params, data_params, net_params, train_params, _ = (
         settings["COMMON"],
@@ -94,6 +81,7 @@ def train():
     # spatial_transformer = fs.SpatialTransformer((256, 256))
 
     mse = losses.MSE()
+    smooth = losses.Grad(loss_mult=2)
     dice = losses.Dice()
 
     alpha = 0.05
@@ -124,13 +112,13 @@ def train():
         drop_last=True,
     )
 
-    n_sub_epochs = 1000 // 1000  # number of times for reloading
-    log_loss: dict[str, int] = {"total_loss": 0, "query_loss": 0, "align_loss": 0}
+    n_epochs = train_params["num_epochs"]
+    log_loss: dict[str, int] = {"total_loss": 0, "query_loss": 0}
 
     i_iter = 0
     print("Start training...")
-    for sub_epoch in range(n_sub_epochs):
-        print(f'This is epoch "{sub_epoch}" of "{n_sub_epochs}" epochs.')
+    for sub_epoch in range(n_epochs):
+        print(f'This is epoch "{sub_epoch}" of "{n_epochs}" epochs.')
         for _, sample in enumerate(train_loader):
             pred_mask = []
             tmp_sprior = []
@@ -206,8 +194,8 @@ def train():
 
             loss_sp: torch.Tensor = (
                 mse.loss(query_labels, sp_img_prior)
-                + alpha * dice.loss(query_labels, sp_mask_prior)
-                # + beta * 1
+                + (alpha * dice.loss(query_labels, sp_mask_prior))
+                + beta * smooth.loss(query_labels, sp_img_prior)
             )
 
             #  y_true = [torch.from_numpy(d).to(device).float().permute(0, 4, 1, 2, 3) for d in y_true]
@@ -255,13 +243,7 @@ def train():
             optimizer.step()
             scheduler.step()
 
-            # Log loss
-            # query_loss = query_loss.detach().data.cpu().numpy()
-            # align_loss = align_loss.detach().data.cpu().numpy()
-
             log_loss["total_loss"] += loss.item()
-            # log_loss["query_loss"] += query_loss
-            # log_loss["align_loss"] += align_loss
 
             # Print loss and take snapshots.
             if (i_iter + 1) % 100 == 0:
