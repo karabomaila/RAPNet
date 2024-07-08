@@ -18,6 +18,7 @@ class SDnetSegmentor(nn.Module):
 
     def __init__(self, params) -> None:
         super(SDnetSegmentor, self).__init__()
+
         params["num_channels"] = 3
         params["num_filters"] = 16
         self.encode1 = cm.SDnetEncoderBlock(params)
@@ -112,6 +113,7 @@ class SDnetSegmentor(nn.Module):
         if inpt_sp is None or inpt_mask is None:
             raise ValueError("All the inputs are required")
 
+        # get the support image and mask spatial prior features
         if len(inpt_sp.shape) == 5:
             tmp_sp_priors = []
             tmp_sp_img_priors = []
@@ -160,6 +162,7 @@ class SDnetSegmentor(nn.Module):
                 corr_bg = Correlation(
                     sp_level_features * (1 - sp_mask), sp_level_features * sp_mask
                 )
+
                 corr_fg = self.q4(
                     torch.cat([corr_fg, sp_level_features * sp_mask], dim=1)
                 )
@@ -243,6 +246,7 @@ class SDnetSegmentor(nn.Module):
                 sp_feats_fg_e2.append(fore_avg_feat)
                 sp_feats_bg_e2.append(bg_avg_feat)
 
+            # support image encoder features
             sp_feat_fg_e4 = torch.mean(torch.stack(sp_feats_fg_e4), 0).unsqueeze(-1)
             sp_feat_bg_e4 = torch.mean(torch.stack(sp_feats_bg_e4), 0).unsqueeze(-1)
 
@@ -252,6 +256,7 @@ class SDnetSegmentor(nn.Module):
             sp_feat_fg_e2 = torch.mean(torch.stack(sp_feats_fg_e2), 0).unsqueeze(-1)
             sp_feat_bg_e2 = torch.mean(torch.stack(sp_feats_bg_e2), 0).unsqueeze(-1)
 
+            # the query image encoder features
             q_level_features = e4
             # aug query each  level features
             sp_prior_r = F.interpolate(
@@ -407,7 +412,7 @@ class RAP(nn.Module):
         return segment
 
     @property
-    def is_cuda(self):
+    def is_cuda(self) -> bool:
         """
         Check if modules parameters are allocated on the GPU.
         """

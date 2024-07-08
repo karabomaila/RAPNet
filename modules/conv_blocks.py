@@ -20,11 +20,12 @@ class GenericBlock(nn.Module):
     :param se_block_type: Squeeze and Excite block type to be included, defaults to None
     :type se_block_type: str, valid options are {'NONE', 'CSE', 'SSE', 'CSSE'}, optional
     :return: forward passed tensor
-    :rtype: torch.tensor [FloatTensor]
+    :type: torch.tensor [FloatTensor]
     """
 
-    def __init__(self, params, se_block_type=None):
+    def __init__(self, params, se_block_type=None) -> None:
         super(GenericBlock, self).__init__()
+
         if se_block_type == se.SELayer.CSE.value:
             self.SELayer = se.ChannelSpatialSELayer(params["num_filters"])
 
@@ -35,8 +36,10 @@ class GenericBlock(nn.Module):
             self.SELayer = se.ChannelSpatialSELayer(params["num_filters"])
         else:
             self.SELayer = None
+
         padding_h = int((params["kernel_h"] - 1) / 2)
         padding_w = int((params["kernel_w"] - 1) / 2)
+
         self.out_channel = params["num_filters"]
         self.conv = nn.Conv2d(
             in_channels=params["num_channels"],
@@ -47,6 +50,7 @@ class GenericBlock(nn.Module):
         )
         self.prelu = nn.PReLU()
         self.batchnorm = nn.BatchNorm2d(num_features=params["num_filters"])
+
         if params["drop_out"] > 0:
             self.drop_out_needed = True
             self.drop_out = nn.Dropout2d(params["drop_out"])
@@ -60,8 +64,8 @@ class GenericBlock(nn.Module):
         :type input: torch.tensor [FloatTensor]
         :param weights: Custom weights for convolution, defaults to None
         :type weights: torch.tensor [FloatTensor], optional
-        :return: [description]
-        :rtype: [type]
+        :return: forward passed tensor
+        :type: torch.tensor [FloatTensor]
         """
 
         _, c, h, w = input.shape
@@ -71,6 +75,7 @@ class GenericBlock(nn.Module):
             weights, _ = torch.max(weights, dim=0)
             weights = weights.view(self.out_channel, c, 1, 1)
             x1 = F.conv2d(input, weights)
+
         x2 = self.prelu(x1)
         x3 = self.batchnorm(x2)
         return x3
