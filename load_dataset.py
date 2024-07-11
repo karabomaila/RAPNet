@@ -304,7 +304,7 @@ class TrainDataset(Dataset):
 
         # if self.use_gt:
         # remove the test label from the training data
-        unique = list(set(unique) - set(self.test_label))
+        unique = list(set(unique) - set(self.test_label))  # training classes
 
         size = 0
         while size < self.min_size:
@@ -317,7 +317,6 @@ class TrainDataset(Dataset):
                 sli_idx = np.sum(lbl == cls_idx, axis=(1, 2)) > 0
 
                 idx = np.arange(lbl.shape[0])
-
                 sli_idx = idx[sli_idx]
 
                 # remove slices containing test labels
