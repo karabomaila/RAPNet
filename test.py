@@ -13,16 +13,13 @@ import load_dataset
 import RAP as fs
 from dataset_specifics import get_label_names
 from settings import Settings
-from utils import Scores
+from utils import Scores, set_logger
 
 SP_SLICES = 3
 IMAGE_SIZE = 256
 SHOTS = 1
 
-logging.basicConfig(
-    filename="./data/logs.log",
-    format="[%(asctime)s] %(levelname)s %(name)s %(threadName)s : %(message)s",
-)
+logger = set_logger("./data/logs.txt")
 
 
 def MR_normalize(x_in):
@@ -47,13 +44,13 @@ def ts_main() -> None:
     torch.cuda.manual_seed_all(0)
 
     # initialize and load the trained model
-    logging.info("Create model...")
+    logger.info("Create model...")
     model = fs.RAP(net_params)
     model.load_state_dict(torch.load("./data/1000model.pth", map_location="cpu"))
     # model.cuda()
     model.eval()
 
-    logging.info("Load data...")
+    logger.info("Load data...")
     data_config = {
         "n_shot": 1,
         "n_way": 1,

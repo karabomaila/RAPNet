@@ -141,9 +141,6 @@ class SDnetSegmentor(nn.Module):
             sp_feats_fg_e2 = []
             sp_feats_bg_e2 = []
 
-            sp_feats_fg_e1 = []
-            sp_feats_bg_e1 = []
-
             for i in range(inpt_sp.shape[0]):
                 bn, ind4, ind3, ind2, ind1, e4_sp, e3_sp, e2_sp, e1_sp = (
                     self.seg_branch_encoder(inpt_sp[i][:, :3])
