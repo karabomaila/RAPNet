@@ -135,7 +135,6 @@ class SDnetSegmentor(nn.Module):
             # k shot atten
             sp_feats_fg_e4 = []
             sp_feats_bg_e4 = []
-
             sp_feats_fg_e3 = []
             sp_feats_bg_e3 = []
             sp_feats_fg_e2 = []
@@ -322,7 +321,7 @@ class SDnetSegmentor(nn.Module):
                 keepdim=True,
             )
 
-            # repeat
+            # e2
             q_level_features = e2
             # aug q level
             sp_prior_r = F.interpolate(

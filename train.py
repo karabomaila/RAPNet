@@ -263,6 +263,7 @@ def train():
                     model.state_dict(),
                     f"./data/{i_iter + 1}model.pth",
                 )
+                # model.save(f"./data/{i_iter + 1}model.pth")
 
             i_iter += 1
     print("End of training.")

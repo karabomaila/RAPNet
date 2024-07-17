@@ -340,6 +340,7 @@ class AF(nn.Module):
 
         padded_x = F.pad(x, [self.padding, self.padding, self.padding, self.padding])
         padded_v = F.pad(v, [self.padding, self.padding, self.padding, self.padding])
+
         q_out = self.query_conv(x)
         k_out = self.key_conv(padded_x)
         v_out = padded_v
