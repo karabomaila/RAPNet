@@ -4,7 +4,9 @@ For Evaluation
 Extended from ADNet code by Hansen et al.
 """
 
+import os
 import random
+import shutil
 from typing import Any
 
 import torch
@@ -30,6 +32,11 @@ def MR_normalize(x_in):
 
 def train():
     logger = set_logger("./data/logs.log")
+    save_path = "./data/prediction"
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
+    os.mkdir(save_path)
+    os.mkdir(save_path + "/snapshorts")
 
     # Deterministic setting for reproducibility.
     random.seed(0)
@@ -261,7 +268,7 @@ def train():
                 print("###### Taking snapshot ######")
                 torch.save(
                     model.state_dict(),
-                    f"./data/{i_iter + 1}model.pth",
+                    f"./data/prediction/snapshorts/{i_iter + 1}model.pth",
                 )
                 # model.save(f"./data/{i_iter + 1}model.pth")
 
