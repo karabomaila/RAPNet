@@ -47,8 +47,8 @@ def train():
     # Enable cuDNN benchmark mode to select the fastest convolution algorithm.
     # cudnn.enabled = True
     # cudnn.benchmark = True
-    print(torch.cuda.is_available())
-    d = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # d = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # torch.cuda.set_device(device=0)
     torch.set_num_threads(1)
 
@@ -210,38 +210,6 @@ def train():
 
             loss: torch.Tensor = loss_sp + loss_seg
 
-            # query_loss = criterion(
-            #     torch.log(
-            #         torch.clamp(
-            #             output.cpu().numpy(),
-            #             torch.finfo(torch.float32).eps,
-            #             1 - torch.finfo(torch.float32).eps,
-            #         )
-            #     ),
-            #     query_labels,
-            # )
-            # support_loss = criterion(
-            #     torch.log(
-            #         torch.clamp(
-            #             sp_pred.cpu().numpy(),
-            #             torch.finfo(torch.float32).eps,
-            #             1 - torch.finfo(torch.float32).eps,
-            #         )
-            #     ),
-            #     support,
-            # )
-
-            # loss = query_loss + support_loss
-
-            # calculate total loss
-            # weights = [0.5, 0.5]
-            # loss = 0
-            # loss_list = []
-            # for n, loss_function in enumerate(losses):
-            #     curr_loss = loss_function(y_true[n], y_pred[n]) * weights[n]
-            #     loss_list.append(curr_loss.item())
-            #     loss += curr_loss
-
             # set the gradients to zero
             optimizer.zero_grad()
 
@@ -253,7 +221,7 @@ def train():
             log_loss["total_loss"] += loss.item()
 
             # Print loss and take snapshots.
-            if (i_iter + 1) % 100 == 0:
+            if (i_iter + 1) % 10000 == 0:
                 total_loss = log_loss["total_loss"] / 100
                 # query_loss = log_loss["query_loss"] / 100
                 # align_loss = log_loss["align_loss"] / 100

@@ -49,6 +49,7 @@ class TestDataset(Dataset):
     def __getitem__(self, idx):
         img_path = self.image_dirs[idx]
         img = sitk.GetArrayFromImage(sitk.ReadImage(img_path))
+        # print("Testing data: ", img.shape)
 
         img = (img - img.mean()) / img.std()
         img = np.stack(3 * [img], axis=1)
@@ -127,12 +128,10 @@ class TestDataset(Dataset):
             sample["image"] = torch.from_numpy(img)
             sample["image"] = sample["image"].permute(1, 0, 2, 3, 4)
 
-            print("Image: ", sample["image"].shape)
+            # print("Image: ", sample["image"].shape)
             sample["label"] = torch.from_numpy(lbl)
             sample["label"] = sample["label"].permute(1, 0, 2, 3, 4)
-            print("label: ", sample["label"].shape)
-        # sup_lbl = sup_lbl[np.newaxis, ...]
-        # sup_img = sup_img[np.newaxis, ...]
+            # print("label: ", sample["label"].shape)
 
         return sample
 
@@ -194,7 +193,6 @@ class TrainDataset(Dataset):
                 self.labels[label_dir] = sitk.GetArrayFromImage(
                     sitk.ReadImage(label_dir)
                 )
-                # self.sprvxls[sprvxl_dir] = sitk.GetArrayFromImage(sitk.ReadImage(sprvxl_dir))
 
     def __len__(self) -> int:
         return self.max_iter
@@ -291,11 +289,6 @@ class TrainDataset(Dataset):
         # normalize
         img = (img - img.mean()) / img.std()
 
-        # chose training label
-        # if self.use_gt:
-        #     lbl = gt.copy()
-        # else:
-        #     lbl = sprvxl.copy()
         lbl = gt.copy()
 
         # sample class(es) (gt/supervoxel)
@@ -411,4 +404,3 @@ class TrainDataset(Dataset):
             "s_padding_mask": s_padding_mask,
         }
         return sample
-        # return sup_img, sup_lbl, qry_img, qry_lbl, padding_mask, s_padding_mask
