@@ -168,7 +168,7 @@ def train():
             out = F.interpolate(
                 out, size=[256, 256], mode="bilinear", align_corners=True
             )
-            output = (out > 0.5).squeeze(1)
+            output = (out > 0.5).squeeze(1).float()
 
             sp_pred = F.interpolate(
                 sp_mask_prior,
@@ -176,7 +176,8 @@ def train():
                 mode="bilinear",
                 align_corners=True,
             )
-            sp_pred = (sp_pred > 0.5).squeeze(1)
+
+            sp_pred = (sp_pred > 0.5).squeeze(1).float()
 
             # flow = spatial_branch.forward(support[0][:, :3], query_images)
             # spatial_prior_support: torch.Tensor = spatial_transformer.forward(
@@ -188,7 +189,7 @@ def train():
             # )
 
             loss_sp: torch.Tensor = (
-                mse.loss(query_labels, sp_img_prior)
+                mse.loss(query_labels, sp_pred)
                 + (alpha * dice.loss(query_labels, sp_mask_prior))
                 + (beta * smooth.loss(query_labels, sp_img_prior))
             )
@@ -213,9 +214,9 @@ def train():
 
                 log_loss["total_loss"] = 0
 
-                print(f"step {i_iter + 1}: total_loss: {total_loss}," f" align_loss: 0")
+                print(f"step {i_iter + 1}: total_loss: {total_loss},")
 
-            if (i_iter + 1) % 1000 == 0:
+            if (i_iter + 1) % 10000 == 0:
                 print("###### Taking snapshot ######")
                 torch.save(
                     model.state_dict(),
