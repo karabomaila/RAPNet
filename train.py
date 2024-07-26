@@ -127,10 +127,6 @@ def train():
     for sub_epoch in range(n_epochs):
         print(f'This is epoch "{sub_epoch}" of "{n_epochs}" epochs.')
         for _, sample in enumerate(train_loader):
-            pred_mask = []
-            tmp_sprior = []
-            sp_mask = []
-
             # Prepare episode data.
             support_images = [
                 [shot.float() for shot in way] for way in sample["support_images"]
@@ -169,8 +165,6 @@ def train():
                 s_mask,
             )
 
-            tmp_sprior.append(out.detach().cpu().numpy())
-
             out = F.interpolate(
                 out, size=[256, 256], mode="bilinear", align_corners=True
             )
@@ -183,12 +177,6 @@ def train():
                 align_corners=True,
             )
             sp_pred = (sp_pred > 0.5).squeeze(1)
-
-            pred_mask.append(output.cpu().numpy())
-            sp_mask.append(sp_pred.squeeze(1).cpu().numpy())
-
-            # pred = np.concatenate(pred_mask, 0)
-            # sp = np.concatenate(sp_mask, 0)
 
             # flow = spatial_branch.forward(support[0][:, :3], query_images)
             # spatial_prior_support: torch.Tensor = spatial_transformer.forward(
@@ -205,7 +193,6 @@ def train():
                 + (beta * smooth.loss(query_labels, sp_img_prior))
             )
 
-            #  y_true = [torch.from_numpy(d).to(device).float().permute(0, 4, 1, 2, 3) for d in y_true]
             loss_seg: torch.Tensor = dice.loss(query_labels, output)
 
             loss: torch.Tensor = loss_sp + loss_seg
@@ -223,12 +210,8 @@ def train():
             # Print loss and take snapshots.
             if (i_iter + 1) % 10000 == 0:
                 total_loss = log_loss["total_loss"] / 100
-                # query_loss = log_loss["query_loss"] / 100
-                # align_loss = log_loss["align_loss"] / 100
 
                 log_loss["total_loss"] = 0
-                # log_loss["query_loss"] = 0
-                # log_loss["align_loss"] = 0
 
                 print(f"step {i_iter + 1}: total_loss: {total_loss}," f" align_loss: 0")
 
@@ -238,7 +221,6 @@ def train():
                     model.state_dict(),
                     f"./data/prediction/snapshorts/{i_iter + 1}model.pth",
                 )
-                # model.save(f"./data/{i_iter + 1}model.pth")
 
             i_iter += 1
     print("End of training.")
