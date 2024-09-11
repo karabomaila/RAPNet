@@ -210,14 +210,14 @@ def train():
             log_loss["total_loss"] += loss.item()
 
             # Print loss and take snapshots.
-            if (i_iter + 1) % 10000 == 0:
+            if (i_iter + 1) % 1000 == 0:
                 total_loss = log_loss["total_loss"] / 100
 
                 log_loss["total_loss"] = 0
 
                 print(f"step {i_iter + 1}: total_loss: {total_loss},")
 
-            if (i_iter + 1) % 10000 == 0:
+            if (i_iter + 1) % 1000 == 0:
                 print("###### Taking snapshot ######")
                 torch.save(
                     model.state_dict(),
@@ -225,6 +225,13 @@ def train():
                 )
 
             i_iter += 1
+
+        if (sub_epoch + 1) == n_epochs:
+            print("###### Taking snapshot ######")
+            torch.save(
+                model.state_dict(),
+                f"./data/prediction/snapshorts/{i_iter + 1}model.pth",
+            )
     print("End of training.")
     return 1
 
