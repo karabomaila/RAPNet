@@ -13,6 +13,7 @@ import torchvision.transforms as deftfx
 from torch.utils.data import Dataset
 
 import image_transforms as myit
+from dataset_specifics import get_folds
 
 images_path = r"./data/CHAOST2/niis/T2SPIR/normalized/image*"
 label_images_path = r"./data/CHAOST2/niis/T2SPIR/normalized/label*"
@@ -175,9 +176,17 @@ class TrainDataset(Dataset):
         # self.sprvxl_dirs = sorted(self.sprvxl_dirs, key=lambda x: int(x.split('_')[-1].split('.nii.gz')[0]))
 
         # remove test fold!
-        # self.FOLD = get_folds(args['dataset'])
-        # self.image_dirs = [elem for idx, elem in enumerate(self.image_dirs) if idx not in self.FOLD[args['eval_fold']]]
-        # self.label_dirs = [elem for idx, elem in enumerate(self.label_dirs) if idx not in self.FOLD[args['eval_fold']]]
+        self.FOLD = get_folds(args["dataset"])
+        self.image_dirs = [
+            elem
+            for idx, elem in enumerate(self.image_dirs)
+            if idx not in self.FOLD[args["eval_fold"]]
+        ]
+        self.label_dirs = [
+            elem
+            for idx, elem in enumerate(self.label_dirs)
+            if idx not in self.FOLD[args["eval_fold"]]
+        ]
         # self.sprvxl_dirs = [elem for idx, elem in enumerate(self.sprvxl_dirs) if
         #                     idx not in self.FOLD[args['eval_fold']]]
 

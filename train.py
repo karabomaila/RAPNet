@@ -96,6 +96,7 @@ def train():
 
     print("Load data...")
     data_config = {
+        "dataset": "CHAOST2",
         "n_shot": 1,
         "n_way": 1,
         "n_query": 1,
